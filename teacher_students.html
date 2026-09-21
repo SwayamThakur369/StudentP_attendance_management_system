@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assign Students to Subject - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .section-divider {
+      margin: 2rem 0 1.5rem 0;
+      border-top: 2px dashed var(--border-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          🎓 Student<span class="accent">AMS</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher-dashboard.html" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+        <a href="teacher-subjects.html" class="nav-item"><span>📚</span><span>Subjects</span></a>
+        <a href="teacher-students.html" class="nav-item active"><span>👥</span><span>Students</span></a>
+        <a href="teacher-start-lecture.html" class="nav-item"><span>▶️</span><span>Start Lecture</span></a>
+        <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
+        <a href="teacher-daily-report.html" class="nav-item"><span>📅</span><span>Daily Report</span></a>
+        <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn btn-ghost btn-block" style="color: #cbd5e1; justify-content: flex-start; gap: 0.75rem;">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+          <h1 class="topbar-title">Student Attendance Management System</h1>
+        </div>
+        <div class="topbar-user">
+          <div class="user-badge">
+            <span class="user-name">Teacher</span>
+            <span class="user-role">teacher</span>
+          </div>
+          <div class="avatar-circle">T</div>
+        </div>
+      </header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Assign Students to Subject</h1>
+            <p class="page-subtitle">Select a subject and add registered students into your class roster.</p>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Subject Selector Panel -->
+        <div class="panel">
+          <div class="form-group" style="margin-bottom: 0; max-width: 450px;">
+            <label class="form-label" for="subject-select">Select Target Subject *</label>
+            <select id="subject-select" class="form-select">
+              <option value="">-- Choose Subject --</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Main Content (Shown when a subject is selected) -->
+        <div id="subject-roster-container" style="display: none;">
+          
+          <!-- SECTION 1: ENROLLED STUDENTS -->
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">1. Enrolled Students in this Subject</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;" id="enrolled-subtitle">Currently enrolled student roster</p>
+              </div>
+              <span id="enrolled-count-badge" class="badge badge-success">0 students enrolled</span>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <input type="text" id="enrolled-search" class="form-control" placeholder="Search enrolled students by name or roll number..." style="max-width: 380px;">
+            </div>
+
+            <div class="table-responsive">
+              <table class="table" id="enrolled-table">
+                <thead>
+                  <tr>
+                    <th>Roll No</th>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                    <th>Division</th>
+                    <th>Email</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="enrolled-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading enrolled students...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- SECTION 2: ADD REGISTERED STUDENTS -->
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">2. Add Registered Students to this Subject</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Select registered students to enroll into this subject</p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span id="selected-counter" class="badge badge-accent" style="font-size: 0.85rem;">0 selected</span>
+                <button type="button" id="add-selected-btn" class="btn btn-primary" disabled>
+                  ➕ Add Selected Students
+                </button>
+              </div>
+            </div>
+
+            <!-- Filters for Available Registered Students -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; background: var(--bg-main); padding: 1rem; border-radius: var(--radius-sm);">
+              
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="filter-class">Filter by Class / Year</label>
+                <select id="filter-class" class="form-select">
+                  <option value="">All Classes</option>
+                  <option value="FE">First Year (FE)</option>
+                  <option value="SE">Second Year (SE)</option>
+                  <option value="TE">Third Year (TE)</option>
+                  <option value="BE">Final Year (BE)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="filter-div">Filter by Division</label>
+                <select id="filter-div" class="form-select">
+                  <option value="">All Divisions</option>
+                  <option value="A">Division A</option>
+                  <option value="B">Division B</option>
+                  <option value="C">Division C</option>
+                  <option value="D">Division D</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="available-search">Search Available Students</label>
+                <input type="text" id="available-search" class="form-control" placeholder="Search by name or roll number...">
+              </div>
+
+            </div>
+
+            <!-- Available Students Table -->
+            <div class="table-responsive">
+              <table class="table" id="available-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px; text-align: center;">
+                      <input type="checkbox" id="select-all-checkbox" aria-label="Select all shown students">
+                    </th>
+                    <th>Roll No</th>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                    <th>Division</th>
+                    <th>Email</th>
+                  </tr>
+                </thead>
+                <tbody id="available-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading available students...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      doc,
+      updateDoc,
+      query,
+      where,
+      arrayUnion,
+      arrayRemove,
+      getStudents,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('teacher', 'students').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        init();
+      }
+    });
+
+    if (session && session.id) {
+      init();
+    }
+
+    const subjectSelect = document.getElementById('subject-select');
+    const rosterContainer = document.getElementById('subject-roster-container');
+
+    // Section 1 elements
+    const enrolledSubtitle = document.getElementById('enrolled-subtitle');
+    const enrolledCountBadge = document.getElementById('enrolled-count-badge');
+    const enrolledSearch = document.getElementById('enrolled-search');
+    const enrolledTbody = document.getElementById('enrolled-tbody');
+
+    // Section 2 elements
+    const filterClass = document.getElementById('filter-class');
+    const filterDiv = document.getElementById('filter-div');
+    const availableSearch = document.getElementById('available-search');
+    const availableTbody = document.getElementById('available-tbody');
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    const selectedCounter = document.getElementById('selected-counter');
+    const addSelectedBtn = document.getElementById('add-selected-btn');
+
+    let teacherSubjects = [];
+    let currentSubject = null;
+    let allRegisteredStudents = [];
+    let enrolledStudentObjects = [];
+    let checkedStudentIds = new Set();
+
+    async function init() {
+      const teacherId = (session && session.id) || (auth.currentUser && auth.currentUser.uid);
+      if (!teacherId) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // 1. Fetch teacher subjects
+        const qSub = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+        const subSnap = await getDocs(qSub);
+        teacherSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (teacherSubjects.length === 0) {
+          subjectSelect.innerHTML = `<option value="">No subjects found</option>`;
+          rosterContainer.style.display = 'none';
+          return;
+        }
+
+        subjectSelect.innerHTML = teacherSubjects.map(s => `
+          <option value="${s.id}">${esc(s.name)} (${esc(s.class)}-${esc(s.division)})</option>
+        `).join('');
+
+        // 2. Load all registered students once
+        const allStSnap = await getDocs(collection(db, 'students'));
+        allRegisteredStudents = allStSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by Roll No
+        allRegisteredStudents.sort((a, b) => (a.rollNo || '').localeCompare(b.rollNo || '', undefined, { numeric: true }));
+
+        // Check query param ?subject=ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const preSel = urlParams.get('subject');
+
+        if (preSel && teacherSubjects.some(s => s.id === preSel)) {
+          subjectSelect.value = preSel;
+        } else {
+          subjectSelect.value = teacherSubjects[0].id;
+        }
+
+        await handleSubjectChange();
+
+      } catch (err) {
+        console.error("Assign students init error:", err);
+        errorAlert.textContent = "Failed to load page: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    subjectSelect.addEventListener('change', handleSubjectChange);
+
+    async function handleSubjectChange() {
+      const subId = subjectSelect.value;
+      if (!subId) {
+        currentSubject = null;
+        rosterContainer.style.display = 'none';
+        return;
+      }
+
+      currentSubject = teacherSubjects.find(s => s.id === subId);
+      rosterContainer.style.display = 'block';
+
+      // Pre-select Class and Division filters to subject's class and division
+      filterClass.value = currentSubject.class || '';
+      filterDiv.value = currentSubject.division || '';
+
+      checkedStudentIds.clear();
+      selectAllCheckbox.checked = false;
+      updateSelectedCounter();
+
+      await loadRosterData();
+    }
+
+    async function loadRosterData() {
+      if (!currentSubject) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        const studentIds = currentSubject.studentIds || [];
+        enrolledStudentObjects = await getStudents(studentIds);
+
+        renderEnrolledTable();
+        renderAvailableTable();
+
+      } catch (err) {
+        console.error("Load roster error:", err);
+        errorAlert.textContent = "Error loading student roster: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    // ==========================================
+    // SECTION 1: ENROLLED STUDENTS
+    // ==========================================
+    enrolledSearch.addEventListener('input', renderEnrolledTable);
+
+    function renderEnrolledTable() {
+      const filter = enrolledSearch.value.trim().toLowerCase();
+      enrolledSubtitle.textContent = `Subject: ${currentSubject.name} (${currentSubject.class}-${currentSubject.division})`;
+      enrolledCountBadge.textContent = `${enrolledStudentObjects.length} students enrolled`;
+
+      let filtered = enrolledStudentObjects;
+      if (filter) {
+        filtered = enrolledStudentObjects.filter(st => 
+          (st.name || '').toLowerCase().includes(filter) ||
+          (st.rollNo || '').toLowerCase().includes(filter)
+        );
+      }
+
+      if (filtered.length === 0) {
+        enrolledTbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              ${filter ? 'No enrolled students match your search.' : 'No students currently enrolled in this subject.'}
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      enrolledTbody.innerHTML = filtered.map(st => `
+        <tr>
+          <td><strong>${esc(st.rollNo)}</strong></td>
+          <td>${esc(st.name)}</td>
+          <td>${esc(st.class)}</td>
+          <td>${esc(st.division)}</td>
+          <td>${esc(st.email || '-')}</td>
+          <td>
+            <button class="btn btn-sm btn-danger remove-btn" data-id="${st.id}">❌ Remove</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleRemoveStudent(btn.dataset.id));
+      });
+    }
+
+    async function handleRemoveStudent(stId) {
+      const st = enrolledStudentObjects.find(s => s.id === stId);
+      if (!st) return;
+
+      if (!confirm(`Are you sure you want to remove student "${st.name}" (Roll No: ${st.rollNo}) from subject "${currentSubject.name}"? Past attendance history will remain intact.`)) {
+        return;
+      }
+
+      try {
+        const subjectRef = doc(db, 'subjects', currentSubject.id);
+        await updateDoc(subjectRef, {
+          studentIds: arrayRemove(stId)
+        });
+
+        // Update local arrays
+        currentSubject.studentIds = (currentSubject.studentIds || []).filter(id => id !== stId);
+        enrolledStudentObjects = enrolledStudentObjects.filter(s => s.id !== stId);
+
+        toast(`Removed ${st.name} from ${currentSubject.name}.`, "success");
+        renderEnrolledTable();
+        renderAvailableTable();
+
+      } catch (err) {
+        console.error("Remove student error:", err);
+        toast("Failed to remove student: " + err.message, "danger");
+      }
+    }
+
+    // ==========================================
+    // SECTION 2: ADD REGISTERED STUDENTS
+    // ==========================================
+    [filterClass, filterDiv, availableSearch].forEach(el => {
+      el.addEventListener('change', () => {
+        checkedStudentIds.clear();
+        selectAllCheckbox.checked = false;
+        updateSelectedCounter();
+        renderAvailableTable();
+      });
+      if (el === availableSearch) {
+        el.addEventListener('input', () => {
+          checkedStudentIds.clear();
+          selectAllCheckbox.checked = false;
+          updateSelectedCounter();
+          renderAvailableTable();
+        });
+      }
+    });
+
+    function getFilteredAvailableStudents() {
+      const enrolledSet = new Set(currentSubject.studentIds || []);
+      const clsFilter = filterClass.value;
+      const divFilter = filterDiv.value;
+      const search = availableSearch.value.trim().toLowerCase();
+
+      // Registered students NOT in this subject
+      const notEnrolled = allRegisteredStudents.filter(st => !enrolledSet.has(st.id));
+
+      const matchingFilters = notEnrolled.filter(st => {
+        if (clsFilter && st.class !== clsFilter) return false;
+        if (divFilter && st.division !== divFilter) return false;
+        if (search) {
+          const matchName = (st.name || '').toLowerCase().includes(search);
+          const matchRoll = (st.rollNo || '').toLowerCase().includes(search);
+          if (!matchName && !matchRoll) return false;
+        }
+        return true;
+      });
+
+      return { notEnrolled, matchingFilters };
+    }
+
+    function renderAvailableTable() {
+      const { notEnrolled, matchingFilters } = getFilteredAvailableStudents();
+
+      if (allRegisteredStudents.length === 0) {
+        availableTbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No registered students found in the database.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (notEnrolled.length === 0) {
+        availableTbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              All registered students are already enrolled in this subject.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (matchingFilters.length === 0) {
+        availableTbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No registered students match these filters.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      availableTbody.innerHTML = matchingFilters.map(st => {
+        const isChecked = checkedStudentIds.has(st.id);
+        return `
+          <tr>
+            <td style="text-align: center;">
+              <input type="checkbox" class="student-checkbox" data-id="${st.id}" ${isChecked ? 'checked' : ''}>
+            </td>
+            <td><strong>${esc(st.rollNo)}</strong></td>
+            <td>${esc(st.name)}</td>
+            <td>${esc(st.class)}</td>
+            <td>${esc(st.division)}</td>
+            <td>${esc(st.email || '-')}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Checkbox event listeners
+      document.querySelectorAll('.student-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = e.target.dataset.id;
+          if (e.target.checked) checkedStudentIds.add(id);
+          else checkedStudentIds.delete(id);
+
+          selectAllCheckbox.checked = matchingFilters.length > 0 && checkedStudentIds.size === matchingFilters.length;
+          updateSelectedCounter();
+        });
+      });
+    }
+
+    selectAllCheckbox.addEventListener('change', (e) => {
+      const { matchingFilters } = getFilteredAvailableStudents();
+      if (e.target.checked) {
+        matchingFilters.forEach(st => checkedStudentIds.add(st.id));
+      } else {
+        checkedStudentIds.clear();
+      }
+      renderAvailableTable();
+      updateSelectedCounter();
+    });
+
+    function updateSelectedCounter() {
+      const count = checkedStudentIds.size;
+      selectedCounter.textContent = `${count} selected`;
+      addSelectedBtn.disabled = count === 0;
+    }
+
+    addSelectedBtn.addEventListener('click', async () => {
+      if (checkedStudentIds.size === 0 || !currentSubject) return;
+
+      const idsToAdd = Array.from(checkedStudentIds);
+      addSelectedBtn.disabled = true;
+      addSelectedBtn.textContent = "Adding...";
+
+      try {
+        const subjectRef = doc(db, 'subjects', currentSubject.id);
+        await updateDoc(subjectRef, {
+          studentIds: arrayUnion(...idsToAdd)
+        });
+
+        // Update local currentSubject studentIds
+        if (!currentSubject.studentIds) currentSubject.studentIds = [];
+        idsToAdd.forEach(id => {
+          if (!currentSubject.studentIds.includes(id)) {
+            currentSubject.studentIds.push(id);
+          }
+        });
+
+        toast(`${idsToAdd.length} student(s) added`, "success");
+
+        checkedStudentIds.clear();
+        selectAllCheckbox.checked = false;
+        updateSelectedCounter();
+
+        await loadRosterData();
+
+      } catch (err) {
+        console.error("Add selected students error:", err);
+        toast("Failed to add students: " + err.message, "danger");
+      } finally {
+        addSelectedBtn.disabled = false;
+        addSelectedBtn.textContent = "➕ Add Selected Students";
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

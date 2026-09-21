@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Email - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .split-container {
+      display: flex;
+      min-height: 100vh;
+      background: var(--bg-main);
+    }
+    .split-navy-panel {
+      flex: 1;
+      background: linear-gradient(135deg, var(--bg-sidebar) 0%, #1e293b 100%);
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .split-navy-panel::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 50%;
+      top: -50px;
+      right: -50px;
+    }
+    .brand-title {
+      font-size: 2.25rem;
+      color: #ffffff;
+      margin-bottom: 1rem;
+    }
+    .brand-title span {
+      color: var(--amber-accent);
+    }
+    .brand-subtitle {
+      font-size: 1.05rem;
+      color: #94a3b8;
+      line-height: 1.6;
+      max-width: 440px;
+    }
+    .split-form-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem;
+      background: #ffffff;
+    }
+    .form-wrapper {
+      width: 100%;
+      max-width: 440px;
+    }
+    .form-header {
+      margin-bottom: 1.5rem;
+    }
+    .form-title {
+      font-size: 1.8rem;
+      color: var(--primary);
+      margin-bottom: 0.4rem;
+    }
+    .form-subtext {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .verification-card {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 850px) {
+      .split-container {
+        flex-direction: column;
+      }
+      .split-navy-panel {
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+      }
+      .brand-subtitle {
+        margin: 0 auto;
+      }
+      .split-form-panel {
+        padding: 2rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="split-container">
+    <div class="split-navy-panel">
+      <div>
+        <h1 class="brand-title">Email <span>Verification</span></h1>
+        <p class="brand-subtitle">Please verify your email address to access your Student AMS dashboard and features.</p>
+      </div>
+    </div>
+
+    <div class="split-form-panel">
+      <div class="form-wrapper">
+        <div class="form-header">
+          <h2 class="form-title">Verify Your Email</h2>
+          <p class="form-subtext" id="info-message">
+            We sent a verification link to <strong id="user-email-display">your email</strong>. Open it, then come back here.
+          </p>
+        </div>
+
+        <div id="alert-box" class="alert alert-info" style="display: none;"></div>
+
+        <div class="verification-card">
+          <div style="font-size: 0.875rem; color: #475569; margin-bottom: 1rem;">
+            💡 <strong>Check your spam folder</strong> if you do not see the email in your main inbox.
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button type="button" id="check-btn" class="btn btn-primary btn-block btn-lg">
+              ✅ I have verified
+            </button>
+
+            <button type="button" id="resend-btn" class="btn btn-outline btn-block">
+              ✉️ Resend email
+            </button>
+          </div>
+        </div>
+
+        <div style="text-align: center; font-size: 0.875rem;">
+          <a href="#" id="logout-link" style="color: var(--danger-color, #ef4444); font-weight: 600;">Log out</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      db,
+      doc,
+      getDoc,
+      onAuthStateChanged,
+      signOut,
+      sendEmailVerification,
+      getSession,
+      clearSession
+    } from './js/app.js';
+
+    const emailDisplay = document.getElementById('user-email-display');
+    const alertBox = document.getElementById('alert-box');
+    const checkBtn = document.getElementById('check-btn');
+    const resendBtn = document.getElementById('resend-btn');
+    const logoutLink = document.getElementById('logout-link');
+
+    let currentUser = null;
+
+    async function redirectVerifiedUser(uid) {
+      let session = getSession();
+      let role = session ? session.role : null;
+
+      if (!role && uid) {
+        // Check Firestore document role if session not found
+        const teacherSnap = await getDoc(doc(db, 'teachers', uid));
+        if (teacherSnap.exists()) {
+          role = 'teacher';
+        } else {
+          role = 'student';
+        }
+      }
+
+      if (role === 'teacher') {
+        window.location.href = 'teacher-dashboard.html';
+      } else {
+        window.location.href = 'student-dashboard.html';
+      }
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        clearSession();
+        window.location.href = 'index.html';
+        return;
+      }
+
+      currentUser = user;
+      emailDisplay.textContent = user.email || 'your email';
+
+      // Check if already verified
+      await user.reload();
+      if (user.emailVerified) {
+        await redirectVerifiedUser(user.uid);
+      }
+    });
+
+    // Auto-check every 5 seconds
+    setInterval(async () => {
+      if (currentUser) {
+        try {
+          await currentUser.reload();
+          if (currentUser.emailVerified) {
+            await redirectVerifiedUser(currentUser.uid);
+          }
+        } catch (e) {
+          console.warn("Auto-check error:", e);
+        }
+      }
+    }, 5000);
+
+    // "I have verified" button handler
+    checkBtn.addEventListener('click', async () => {
+      alertBox.style.display = 'none';
+      if (!currentUser) return;
+
+      checkBtn.disabled = true;
+      checkBtn.textContent = 'Checking...';
+
+      try {
+        await currentUser.reload();
+        if (currentUser.emailVerified) {
+          await redirectVerifiedUser(currentUser.uid);
+        } else {
+          alertBox.className = 'alert alert-danger';
+          alertBox.textContent = 'Not verified yet. Check your inbox and spam folder.';
+          alertBox.style.display = 'flex';
+        }
+      } catch (err) {
+        console.error("Verification check error:", err);
+        alertBox.className = 'alert alert-danger';
+        alertBox.textContent = 'Error checking verification status. Please try again.';
+        alertBox.style.display = 'flex';
+      } finally {
+        checkBtn.disabled = false;
+        checkBtn.textContent = '✅ I have verified';
+      }
+    });
+
+    // "Resend email" button handler with 60s countdown
+    let countdownTimer = null;
+    function startCountdown(seconds) {
+      let remaining = seconds;
+      resendBtn.disabled = true;
+      resendBtn.textContent = `Resend in ${remaining}s`;
+
+      countdownTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(countdownTimer);
+          resendBtn.disabled = false;
+          resendBtn.textContent = '✉️ Resend email';
+        } else {
+          resendBtn.textContent = `Resend in ${remaining}s`;
+        }
+      }, 1000);
+    }
+
+    resendBtn.addEventListener('click', async () => {
+      alertBox.style.display = 'none';
+      if (!currentUser) return;
+
+      try {
+        await sendEmailVerification(currentUser);
+        alertBox.className = 'alert alert-success';
+        alertBox.textContent = 'Verification email resent successfully! Check your inbox and spam folder.';
+        alertBox.style.display = 'flex';
+        startCountdown(60);
+      } catch (err) {
+        console.error("Resend error:", err);
+        alertBox.className = 'alert alert-danger';
+        if (err.code === 'auth/too-many-requests') {
+          alertBox.textContent = 'Too many requests. Please wait a moment before trying again.';
+        } else {
+          alertBox.textContent = 'Failed to resend email: ' + (err.message || err);
+        }
+        alertBox.style.display = 'flex';
+      }
+    });
+
+    // Log out handler
+    logoutLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error("SignOut error:", err);
+      }
+      clearSession();
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance History - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Attendance History</h1>
+            <p class="page-subtitle">View your past lecture attendance logs and history.</p>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Filters Panel -->
+        <div class="panel">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+            
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="month-filter">Filter by Month</label>
+              <input type="month" id="month-filter" class="form-control">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="subject-filter">Filter by Subject</label>
+              <select id="subject-filter" class="form-select">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="status-filter">Filter by Status</label>
+              <select id="status-filter" class="form-select">
+                <option value="">All Statuses</option>
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- History Table Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Attendance Log</h2>
+            <span id="log-count-badge" class="badge badge-secondary">0 Logs</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Subject Name</th>
+                  <th>Teacher Name</th>
+                  <th>Lecture Time</th>
+                  <th>Marked Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading history logs...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      query,
+      where,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('student', 'attendance-history').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        init();
+      }
+    });
+
+    if (session && session.id) {
+      init();
+    }
+
+    const monthFilter = document.getElementById('month-filter');
+    const subjectFilter = document.getElementById('subject-filter');
+    const statusFilter = document.getElementById('status-filter');
+
+    let allRecords = [];
+    let enrolledSubjects = [];
+
+    async function init() {
+      if (!session) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // 1. Fetch enrolled subjects
+        const subQ = query(collection(db, 'subjects'), where('studentIds', 'array-contains', session.id));
+        const subSnap = await getDocs(subQ);
+        enrolledSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        subjectFilter.innerHTML = `<option value="">All Subjects</option>` +
+          enrolledSubjects.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+
+        // 2. Fetch all attendance records for student
+        const attQ = query(collection(db, 'attendance'), where('studentId', '==', session.id));
+        const attSnap = await getDocs(attQ);
+        
+        allRecords = attSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort newest first
+        allRecords.sort((a, b) => (b.markedAtMs || 0) - (a.markedAtMs || 0));
+
+        renderHistoryTable();
+
+      } catch (err) {
+        console.error("History init error:", err);
+        errorAlert.textContent = "Failed to load history logs: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    [monthFilter, subjectFilter, statusFilter].forEach(el => {
+      el.addEventListener('change', renderHistoryTable);
+    });
+
+    function renderHistoryTable() {
+      const selectedMonth = monthFilter.value;
+      const selectedSubId = subjectFilter.value;
+      const selectedStatus = statusFilter.value;
+
+      const filtered = allRecords.filter(r => {
+        if (selectedMonth && r.month !== selectedMonth) return false;
+        if (selectedSubId && r.subjectId !== selectedSubId) return false;
+        if (selectedStatus && r.status !== selectedStatus) return false;
+        return true;
+      });
+
+      document.getElementById('log-count-badge').textContent = `${filtered.length} Logs`;
+      const tbody = document.getElementById('history-tbody');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No attendance records match your filter criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => `
+        <tr>
+          <td><strong>${esc(r.date)}</strong></td>
+          <td>${esc(r.subjectName)}</td>
+          <td>${esc(r.teacherName || '-')}</td>
+          <td>${esc(r.startTime || '-')}</td>
+          <td>${esc(r.markedAt || '-')}</td>
+          <td>
+            ${r.status === 'present' ? '<span class="badge badge-success">Present</span>' : '<span class="badge badge-danger">Absent</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    init();
+  </script>
+</body>
+</html>

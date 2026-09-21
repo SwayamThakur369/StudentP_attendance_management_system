@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Subjects - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          🎓 Student<span class="accent">AMS</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher-dashboard.html" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+        <a href="teacher-subjects.html" class="nav-item active"><span>📚</span><span>Subjects</span></a>
+        <a href="teacher-students.html" class="nav-item"><span>👥</span><span>Students</span></a>
+        <a href="teacher-start-lecture.html" class="nav-item"><span>▶️</span><span>Start Lecture</span></a>
+        <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
+        <a href="teacher-daily-report.html" class="nav-item"><span>📅</span><span>Daily Report</span></a>
+        <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn btn-ghost btn-block" style="color: #cbd5e1; justify-content: flex-start; gap: 0.75rem;">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+          <h1 class="topbar-title">Student Attendance Management System</h1>
+        </div>
+        <div class="topbar-user">
+          <div class="user-badge">
+            <span class="user-name">Teacher</span>
+            <span class="user-role">teacher</span>
+          </div>
+          <div class="avatar-circle">T</div>
+        </div>
+      </header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Manage Subjects</h1>
+            <p class="page-subtitle">Add, update, or remove subjects for your classes.</p>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Form Card -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title" id="form-title">Add New Subject</h2>
+          </div>
+          <form id="subject-form">
+            <input type="hidden" id="edit-subject-id" value="">
+            <input type="hidden" id="selected-role" value="teacher">
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="subject-name">Subject Name *</label>
+                <input type="text" id="subject-name" class="form-control" placeholder="e.g. Data Structures" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="subject-class">Class / Year *</label>
+                <select id="subject-class" class="form-select" required>
+                  <option value="">-- Select Year --</option>
+                  <option value="FE">First Year (FE)</option>
+                  <option value="SE">Second Year (SE)</option>
+                  <option value="TE">Third Year (TE)</option>
+                  <option value="BE">Final Year (BE)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="subject-division">Division *</label>
+                <select id="subject-division" class="form-select" required>
+                  <option value="">-- Select Div --</option>
+                  <option value="A">Division A</option>
+                  <option value="B">Division B</option>
+                  <option value="C">Division C</option>
+                  <option value="D">Division D</option>
+                </select>
+              </div>
+
+
+              <div class="form-group">
+                <label class="form-label" for="subject-semester">Semester *</label>
+                <input type="text" id="subject-semester" class="form-control" placeholder="e.g. 3, 4, 5" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="subject-year">Academic Year *</label>
+                <input type="text" id="subject-year" class="form-control" placeholder="e.g. 2026-27" required>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+              <button type="submit" id="save-btn" class="btn btn-primary">➕ Add Subject</button>
+              <button type="button" id="cancel-btn" class="btn btn-ghost" style="display: none;">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Subjects Table Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Your Subjects</h2>
+          </div>
+          <div class="table-responsive">
+            <table class="table" id="subjects-table">
+              <thead>
+                <tr>
+                  <th>Subject Name</th>
+                  <th>Class</th>
+                  <th>Division</th>
+                  <th>Semester</th>
+                  <th>Academic Year</th>
+                  <th>Enrolled Students</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="subjects-tbody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading subjects...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      onAuthStateChanged,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      doc,
+      addDoc,
+      updateDoc,
+      deleteDoc,
+      query,
+      where,
+      onSnapshot,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+    let unsubscribeSnapshot = null;
+    let teacherSubjects = [];
+
+    function getTeacherId() {
+      return (session && session.id) || (auth.currentUser && auth.currentUser.uid) || null;
+    }
+
+    function initSubjectListener() {
+      const teacherId = getTeacherId();
+      if (!teacherId) return;
+
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+
+      const q = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+      unsubscribeSnapshot = onSnapshot(q, (snap) => {
+        teacherSubjects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderSubjectsTable();
+      }, (err) => {
+        console.error("Subjects snapshot error:", err);
+        errorAlert.textContent = "Failed to load subjects: " + err.message;
+        errorAlert.style.display = "flex";
+      });
+    }
+
+    async function loadSubjects() {
+      const teacherId = getTeacherId();
+      if (!teacherId) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        const q = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+        const snap = await getDocs(q);
+        teacherSubjects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderSubjectsTable();
+      } catch (err) {
+        console.error("Load subjects error:", err);
+        errorAlert.textContent = "Failed to load subjects: " + err.message;
+        errorAlert.style.display = "flex";
+      }
+    }
+
+    // 1. Initial shell mount
+    mountShell('teacher', 'subjects').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        initSubjectListener();
+        loadSubjects();
+      }
+    });
+
+    // 2. Direct Auth listener for immediate ID availability
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        if (!session) session = {};
+        session.id = user.uid;
+        session.role = 'teacher';
+        initSubjectListener();
+        loadSubjects();
+      }
+    });
+
+    // 3. Fallback immediate check if session already cached
+    if (session && session.id) {
+      initSubjectListener();
+      loadSubjects();
+    }
+
+    const form = document.getElementById('subject-form');
+    const editIdInput = document.getElementById('edit-subject-id');
+    const nameInput = document.getElementById('subject-name');
+    const classInput = document.getElementById('subject-class');
+    const divInput = document.getElementById('subject-division');
+    const semInput = document.getElementById('subject-semester');
+    const yearInput = document.getElementById('subject-year');
+    
+    const saveBtn = document.getElementById('save-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const formTitle = document.getElementById('form-title');
+
+    function renderSubjectsTable() {
+      const tbody = document.getElementById('subjects-tbody');
+      if (!tbody) return;
+
+      if (teacherSubjects.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+              No subjects found. Use the form above to add your first subject.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = teacherSubjects.map(sub => `
+        <tr>
+          <td><strong>${esc(sub.name)}</strong></td>
+          <td><span class="badge badge-info">${esc(sub.class)}</span></td>
+          <td>${esc(sub.division)}</td>
+          <td>Sem ${esc(sub.semester)}</td>
+          <td>${esc(sub.academicYear)}</td>
+          <td><span class="badge badge-success">${(sub.studentIds || []).length} students</span></td>
+          <td>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <a href="teacher-students.html?subject=${sub.id}" class="btn btn-sm btn-ghost" title="Assign Students to Subject" style="color: var(--primary); font-weight: 600;">
+                👥 Students
+              </a>
+              <button class="btn btn-sm btn-secondary edit-btn" data-id="${sub.id}">
+                ✏️ Edit
+              </button>
+              <button class="btn btn-sm btn-danger delete-btn" data-id="${sub.id}">
+                🗑️ Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const subId = btn.getAttribute('data-id');
+          handleEdit(subId);
+        });
+      });
+
+      tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const subId = btn.getAttribute('data-id');
+          handleDelete(subId);
+        });
+      });
+    }
+
+    function handleEdit(subId) {
+      const sub = teacherSubjects.find(s => s.id === subId);
+      if (!sub) return;
+
+      editIdInput.value = sub.id;
+      nameInput.value = sub.name;
+      classInput.value = sub.class;
+      divInput.value = sub.division;
+      semInput.value = sub.semester;
+      yearInput.value = sub.academicYear;
+
+      formTitle.textContent = "Edit Subject";
+      saveBtn.textContent = "💾 Update Subject";
+      cancelBtn.style.display = "inline-flex";
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      nameInput.focus();
+    }
+
+    function resetForm() {
+      editIdInput.value = '';
+      form.reset();
+      formTitle.textContent = "Add New Subject";
+      saveBtn.textContent = "+ Add Subject";
+      cancelBtn.style.display = "none";
+    }
+
+    cancelBtn.addEventListener('click', resetForm);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const teacherId = getTeacherId();
+      if (!teacherId) {
+        alert("Session expired or not authenticated. Please log in again.");
+        window.location.href = 'teacher-login.html';
+        return;
+      }
+
+      const name = nameInput.value.trim();
+      const className = classInput.value;
+      const division = divInput.value;
+      const semester = parseInt(semInput.value, 10);
+      const academicYear = yearInput.value.trim();
+
+      if (!name || !className || !division || isNaN(semester) || !academicYear) {
+        alert("Please fill in all required fields.");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      errorAlert.style.display = 'none';
+
+      try {
+        const editId = editIdInput.value;
+
+        if (editId) {
+          // Update Subject
+          await updateDoc(doc(db, 'subjects', editId), {
+            name,
+            class: className,
+            division,
+            semester,
+            academicYear
+          });
+          toast("Subject updated successfully!", "success");
+          resetForm();
+          await loadSubjects();
+        } else {
+          // Add Subject
+          const newSubRef = await addDoc(collection(db, 'subjects'), {
+            teacherId: teacherId,
+            name,
+            class: className,
+            division,
+            semester,
+            academicYear,
+            studentIds: []
+          });
+          toast("Subject added successfully!", "success");
+          resetForm();
+          await loadSubjects();
+        }
+      } catch (err) {
+        console.error("Save subject error:", err);
+        errorAlert.textContent = "Error saving subject: " + err.message;
+        errorAlert.style.display = "flex";
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    async function handleDelete(subId) {
+      const sub = teacherSubjects.find(s => s.id === subId);
+      if (!sub) return;
+
+      // Check if subject has active lecture
+      try {
+        const activeLectQ = query(
+          collection(db, 'lectures'),
+          where('subjectId', '==', subId),
+          where('status', '==', 'active')
+        );
+        const activeLectSnap = await getDocs(activeLectQ);
+
+        if (!activeLectSnap.empty) {
+          alert(`Cannot delete subject "${sub.name}" because it currently has an active running lecture.`);
+          return;
+        }
+
+        if (!confirm(`Are you sure you want to delete the subject "${sub.name}"? This action cannot be undone.`)) {
+          return;
+        }
+
+        await deleteDoc(doc(db, 'subjects', subId));
+        toast(`Subject "${sub.name}" deleted.`, "success");
+        await loadSubjects();
+      } catch (err) {
+        console.error("Delete subject error:", err);
+        toast("Failed to delete subject: " + err.message, "danger");
+      }
+    }
+  </script>
+</body>
+</html>

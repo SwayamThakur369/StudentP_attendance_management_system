@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Attendance Report - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .low-attendance-row {
+      background-color: #fef2f2 !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Monthly Attendance Report</h1>
+            <p class="page-subtitle">Monthly cumulative attendance metrics and low-attendance tracking.</p>
+          </div>
+          <div>
+            <button id="download-csv-btn" class="btn btn-primary">📥 Download CSV Report</button>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Controls Panel -->
+        <div class="panel">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; align-items: end;">
+            
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="month-picker">Select Month *</label>
+              <input type="month" id="month-picker" class="form-control">
+            </div>
+
+            <div class="form-group" id="subject-select-container" style="margin-bottom: 0; display: none;">
+              <label class="form-label" for="subject-select">Select Subject *</label>
+              <select id="subject-select" class="form-select">
+                <option value="">-- Choose Subject --</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Summary Stat Cards -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-info">
+              <div class="stat-label">Lectures Held</div>
+              <div class="stat-value" id="stat-total-lectures">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <div class="stat-label">Average Attendance</div>
+              <div class="stat-value" id="stat-avg-pct">0%</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-danger">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-info">
+              <div class="stat-label">Low Attendance (&lt;75%)</div>
+              <div class="stat-value" id="stat-low-count">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Report Table Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title" id="table-title">Monthly Cumulative Sheet</h2>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table" id="report-table">
+              <thead id="report-thead">
+                <!-- Dynamic Header based on role -->
+              </thead>
+              <tbody id="report-tbody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading monthly report...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      query,
+      where,
+      todayStr,
+      monthOf,
+      getStudents,
+      percent,
+      MIN_PERCENT,
+      downloadCSV,
+      esc,
+      toast
+    } from './js/app.js';
+
+    const monthPicker = document.getElementById('month-picker');
+    const subjectContainer = document.getElementById('subject-select-container');
+    const subjectSelect = document.getElementById('subject-select');
+    const downloadBtn = document.getElementById('download-csv-btn');
+    const errorAlert = document.getElementById('error-alert');
+
+    // Immediately set current month
+    monthPicker.value = monthOf(todayStr());
+
+    let session = getSession();
+    let role = (session && session.role) ? session.role : 'teacher';
+    let teacherSubjects = [];
+    let reportExportRows = [];
+
+    // Mount shell immediately and update once authenticated
+    mountShell('any', 'monthly-report').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        role = session.role;
+        init();
+      }
+    });
+
+    // Run immediate init if session already cached
+    if (session && session.id) {
+      init();
+    }
+
+    async function init() {
+      errorAlert.style.display = 'none';
+
+      try {
+        if (role === 'teacher') {
+          subjectContainer.style.display = 'block';
+
+          // Fetch teacher's subjects
+          const qSub = query(collection(db, 'subjects'), where('teacherId', '==', session.id));
+          const subSnap = await getDocs(qSub);
+          teacherSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+          if (teacherSubjects.length === 0) {
+            subjectSelect.innerHTML = `<option value="">No subjects found</option>`;
+            document.getElementById('report-tbody').innerHTML = `
+              <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No subjects created yet.</td></tr>
+            `;
+            return;
+          }
+
+          subjectSelect.innerHTML = teacherSubjects.map(s => `
+            <option value="${s.id}">${esc(s.name)} (${esc(s.class)}-${esc(s.division)})</option>
+          `).join('');
+
+          await loadTeacherMonthlyReport();
+
+        } else {
+          // Student View
+          await loadStudentMonthlyReport();
+        }
+
+      } catch (err) {
+        console.error("Monthly report init error:", err);
+        errorAlert.textContent = "Failed to load monthly report: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    monthPicker.addEventListener('change', () => {
+      if (role === 'teacher') loadTeacherMonthlyReport();
+      else loadStudentMonthlyReport();
+    });
+
+    subjectSelect.addEventListener('change', () => {
+      if (role === 'teacher') loadTeacherMonthlyReport();
+    });
+
+    // ==========================================
+    // TEACHER MONTHLY REPORT
+    // ==========================================
+    async function loadTeacherMonthlyReport() {
+      const selectedMonth = monthPicker.value;
+      const selectedSubId = subjectSelect.value;
+      if (!selectedMonth || !selectedSubId) return;
+
+      errorAlert.style.display = 'none';
+
+      try {
+        const subject = teacherSubjects.find(s => s.id === selectedSubId);
+        if (!subject) return;
+
+        // 1. Fetch all lectures for this subject
+        const lectQ = query(
+          collection(db, 'lectures'),
+          where('subjectId', '==', selectedSubId)
+        );
+        const lectSnap = await getDocs(lectQ);
+        const monthLectures = lectSnap.docs.filter(d => {
+          const data = d.data();
+          return data.month === selectedMonth || (data.date && data.date.startsWith(selectedMonth));
+        });
+
+        // 2. Fetch enrolled students
+        const enrolledStudents = await getStudents(subject.studentIds || []);
+
+        // 3. Fetch attendance records for this subject
+        const attQ = query(
+          collection(db, 'attendance'),
+          where('subjectId', '==', selectedSubId)
+        );
+        const attSnap = await getDocs(attQ);
+        const monthAttDocs = attSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(d => d.month === selectedMonth || (d.date && d.date.startsWith(selectedMonth)));
+
+        const distinctLectureIds = new Set(monthLectures.map(d => d.id));
+        monthAttDocs.forEach(d => {
+          if (d.lectureId) distinctLectureIds.add(d.lectureId);
+        });
+        const totalHeldLectures = Math.max(monthLectures.length, distinctLectureIds.size);
+
+        const studentPresentCounts = new Map();
+        const studentAbsentCounts = new Map();
+        monthAttDocs.forEach(data => {
+          if (data.status === 'present') {
+            studentPresentCounts.set(data.studentId, (studentPresentCounts.get(data.studentId) || 0) + 1);
+          } else if (data.status === 'absent') {
+            studentAbsentCounts.set(data.studentId, (studentAbsentCounts.get(data.studentId) || 0) + 1);
+          }
+        });
+
+        // Compute rows
+        let totalPctSum = 0;
+        let lowAttendanceCount = 0;
+
+        const tableRows = enrolledStudents.map(st => {
+          const present = studentPresentCounts.get(st.id) || 0;
+          const recordedAbsent = studentAbsentCounts.get(st.id) || 0;
+          const total = Math.max(totalHeldLectures, present + recordedAbsent, present);
+          const absent = Math.max(recordedAbsent, total - present);
+          const pct = percent(present, total);
+
+          totalPctSum += pct;
+          if (total > 0 && pct < MIN_PERCENT) {
+            lowAttendanceCount++;
+          }
+
+          return {
+            rollNo: st.rollNo,
+            name: st.name,
+            total,
+            present,
+            absent,
+            pct
+          };
+        });
+
+        const avgPct = enrolledStudents.length > 0 ? Math.round(totalPctSum / enrolledStudents.length) : 0;
+
+        document.getElementById('stat-total-lectures').textContent = totalHeldLectures;
+        document.getElementById('stat-avg-pct').textContent = `${avgPct}%`;
+        document.getElementById('stat-low-count').textContent = lowAttendanceCount;
+
+        renderTeacherTable(tableRows);
+
+        // Prepare export rows
+        reportExportRows = tableRows.map(r => ({
+          "Roll No": r.rollNo,
+          "Student Name": r.name,
+          "Total Lectures": r.total,
+          "Present": r.present,
+          "Absent": r.absent,
+          "Attendance %": `${r.pct}%`,
+          "Status": (r.total > 0 && r.pct < MIN_PERCENT) ? "Low Attendance" : (r.total === 0 ? "No Lectures" : "Good")
+        }));
+
+      } catch (err) {
+        console.error("Teacher monthly report error:", err);
+        errorAlert.textContent = "Error loading report: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    function renderTeacherTable(rows) {
+      const thead = document.getElementById('report-thead');
+      const tbody = document.getElementById('report-tbody');
+
+      thead.innerHTML = `
+        <tr>
+          <th>Roll No</th>
+          <th>Student Name</th>
+          <th>Total Lectures</th>
+          <th>Present</th>
+          <th>Absent</th>
+          <th>Attendance %</th>
+          <th>Status</th>
+        </tr>
+      `;
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No students enrolled in this subject.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const isLow = r.total > 0 && r.pct < MIN_PERCENT;
+        return `
+          <tr class="${isLow ? 'low-attendance-row' : ''}">
+            <td><strong>${esc(r.rollNo)}</strong></td>
+            <td>${esc(r.name)}</td>
+            <td>${r.total}</td>
+            <td style="color: var(--success-text); font-weight: 600;">${r.present}</td>
+            <td style="color: var(--danger-text); font-weight: 600;">${r.absent}</td>
+            <td><strong>${r.pct}%</strong></td>
+            <td>
+              ${r.total === 0 ? '<span class="badge badge-muted">No Lectures</span>' :
+                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` :
+                '<span class="badge badge-success">Good</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // STUDENT MONTHLY REPORT
+    // ==========================================
+    async function loadStudentMonthlyReport() {
+      const selectedMonth = monthPicker.value;
+      if (!selectedMonth) return;
+
+      const studentId = (session && session.id) || (auth.currentUser && auth.currentUser.uid);
+      if (!studentId) return;
+
+      errorAlert.style.display = 'none';
+
+      try {
+        // Fetch enrolled subjects
+        const subQ = query(collection(db, 'subjects'), where('studentIds', 'array-contains', studentId));
+        const subSnap = await getDocs(subQ);
+        const enrolledSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Fetch student's attendance records
+        const attQ = query(
+          collection(db, 'attendance'),
+          where('studentId', '==', studentId)
+        );
+        const attSnap = await getDocs(attQ);
+        const allStudentRecords = attSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const attendanceRecords = allStudentRecords.filter(r => 
+          r.month === selectedMonth || (r.date && r.date.startsWith(selectedMonth))
+        );
+
+        let overallTotalLectures = 0;
+        let overallPctSum = 0;
+        let lowCount = 0;
+
+        const tableRows = await Promise.all(enrolledSubjects.map(async sub => {
+          // Fetch all lectures for this subject
+          const lectQ = query(
+            collection(db, 'lectures'),
+            where('subjectId', '==', sub.id)
+          );
+          const lectSnap = await getDocs(lectQ);
+          const monthLectures = lectSnap.docs.filter(d => {
+            const data = d.data();
+            return data.month === selectedMonth || (data.date && data.date.startsWith(selectedMonth));
+          });
+
+          const subRecords = attendanceRecords.filter(r => r.subjectId === sub.id);
+          const present = subRecords.filter(r => r.status === 'present').length;
+          const recordedAbsent = subRecords.filter(r => r.status === 'absent').length;
+
+          // Distinct lecture IDs recorded in attendance for this subject
+          const distinctAttLectures = new Set(subRecords.map(r => r.lectureId).filter(Boolean));
+
+          const totalLectures = Math.max(
+            monthLectures.length,
+            distinctAttLectures.size,
+            present + recordedAbsent,
+            present
+          );
+
+          const absent = Math.max(recordedAbsent, totalLectures - present);
+          const pct = percent(present, totalLectures);
+
+          overallTotalLectures += totalLectures;
+          overallPctSum += pct;
+
+          if (totalLectures > 0 && pct < MIN_PERCENT) {
+            lowCount++;
+          }
+
+          return {
+            subjectName: sub.name,
+            total: totalLectures,
+            present,
+            absent,
+            pct
+          };
+        }));
+
+        const avgPct = tableRows.length > 0 ? Math.round(overallPctSum / tableRows.length) : 0;
+
+        document.getElementById('stat-total-lectures').textContent = overallTotalLectures;
+        document.getElementById('stat-avg-pct').textContent = `${avgPct}%`;
+        document.getElementById('stat-low-count').textContent = lowCount;
+
+        renderStudentTable(tableRows);
+
+        // Prepare export rows
+        reportExportRows = tableRows.map(r => ({
+          "Subject": r.subjectName,
+          "Total Lectures": r.total,
+          "Present": r.present,
+          "Absent": r.absent,
+          "Attendance %": `${r.pct}%`,
+          "Status": (r.total > 0 && r.pct < MIN_PERCENT) ? "Low Attendance" : (r.total === 0 ? "No Lectures" : "Good")
+        }));
+
+      } catch (err) {
+        console.error("Student monthly report error:", err);
+        errorAlert.textContent = "Error loading report: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    function renderStudentTable(rows) {
+      const thead = document.getElementById('report-thead');
+      const tbody = document.getElementById('report-tbody');
+
+      thead.innerHTML = `
+        <tr>
+          <th>Subject Name</th>
+          <th>Total Lectures</th>
+          <th>Present</th>
+          <th>Absent</th>
+          <th>Attendance %</th>
+          <th>Status</th>
+        </tr>
+      `;
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              You are not enrolled in any subjects.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => {
+        const isLow = r.total > 0 && r.pct < MIN_PERCENT;
+        return `
+          <tr class="${isLow ? 'low-attendance-row' : ''}">
+            <td><strong>${esc(r.subjectName)}</strong></td>
+            <td>${r.total}</td>
+            <td style="color: var(--success-text); font-weight: 600;">${r.present}</td>
+            <td style="color: var(--danger-text); font-weight: 600;">${r.absent}</td>
+            <td><strong>${r.pct}%</strong></td>
+            <td>
+              ${r.total === 0 ? '<span class="badge badge-muted">No Lectures</span>' :
+                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` :
+                '<span class="badge badge-success">Good</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (reportExportRows.length === 0) {
+        toast("No report data to download.", "warning");
+        return;
+      }
+      downloadCSV(`Monthly_Attendance_Report_${monthPicker.value}.csv`, reportExportRows);
+      toast("Monthly report CSV downloaded.", "success");
+    });
+
+    init();
+  </script>
+</body>
+</html>

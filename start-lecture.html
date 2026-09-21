@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start Lecture - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .active-banner {
+      background: #ecfdf5;
+      border: 1px solid #6ee7b7;
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          🎓 Student<span class="accent">AMS</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher-dashboard.html" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+        <a href="teacher-subjects.html" class="nav-item"><span>📚</span><span>Subjects</span></a>
+        <a href="teacher-students.html" class="nav-item"><span>👥</span><span>Students</span></a>
+        <a href="teacher-start-lecture.html" class="nav-item active"><span>▶️</span><span>Start Lecture</span></a>
+        <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
+        <a href="teacher-daily-report.html" class="nav-item"><span>📅</span><span>Daily Report</span></a>
+        <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn btn-ghost btn-block" style="color: #cbd5e1; justify-content: flex-start; gap: 0.75rem;">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+          <h1 class="topbar-title">Student Attendance Management System</h1>
+        </div>
+        <div class="topbar-user">
+          <div class="user-badge">
+            <span class="user-name">Teacher</span>
+            <span class="user-role">teacher</span>
+          </div>
+          <div class="avatar-circle">T</div>
+        </div>
+      </header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Start Lecture</h1>
+            <p class="page-subtitle">Host a live lecture session for attendance marking.</p>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Active Lecture Notice Banner (Shown if teacher already has active lecture) -->
+        <div id="active-banner" class="active-banner" style="display: none;">
+          <div>
+            <span class="badge badge-success" style="font-size: 0.85rem; margin-bottom: 0.3rem;">● Session Currently Active</span>
+            <h3 id="active-sub-title" style="color: var(--primary); font-size: 1.2rem;">--</h3>
+            <p id="active-sub-info" style="color: var(--text-muted); font-size: 0.875rem;">Started at: --</p>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <a id="active-live-link" href="#" class="btn btn-success">📡 Open Live Attendance Console</a>
+            <button id="active-stop-btn" class="btn btn-danger">⛔ Stop Lecture</button>
+          </div>
+        </div>
+
+        <!-- Start Lecture Card -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Select Subject &amp; Class</h2>
+          </div>
+
+          <form id="start-lecture-form">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+              
+              <!-- 1. Class Dropdown -->
+              <div class="form-group">
+                <label class="form-label" for="class-select">1. Select Class *</label>
+                <select id="class-select" class="form-select" required>
+                  <option value="">-- Choose Class --</option>
+                </select>
+              </div>
+
+              <!-- 2. Division Dropdown -->
+              <div class="form-group">
+                <label class="form-label" for="division-select">2. Select Division *</label>
+                <select id="division-select" class="form-select" required disabled>
+                  <option value="">-- Choose Division --</option>
+                </select>
+              </div>
+
+              <!-- 3. Subject Dropdown -->
+              <div class="form-group">
+                <label class="form-label" for="subject-select">3. Select Subject *</label>
+                <select id="subject-select" class="form-select" required disabled>
+                  <option value="">-- Choose Subject --</option>
+                </select>
+              </div>
+
+            </div>
+
+            <!-- Subject Info Line & Warning -->
+            <div id="subject-info-box" class="alert alert-info" style="display: none; align-items: center; justify-content: space-between;">
+              <span id="subject-info-text">Select a subject to view student count.</span>
+              <span id="student-count-badge" class="badge badge-secondary">0 Students</span>
+            </div>
+
+            <div id="zero-warning" class="alert alert-warning" style="display: none;">
+              ⚠️ Warning: This subject currently has <strong>0 enrolled students</strong>. Students must be enrolled in this subject to mark attendance.
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+              <button type="submit" id="start-btn" class="btn btn-success btn-lg" style="min-width: 240px;" disabled>
+                ▶️ Start Lecture Session
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDoc,
+      doc,
+      getDocs,
+      query,
+      where,
+      startLecture,
+      stopLecture,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('teacher', 'start-lecture').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        init();
+      }
+    });
+
+    if (session && session.id) {
+      init();
+    }
+
+    const classSelect = document.getElementById('class-select');
+    const divisionSelect = document.getElementById('division-select');
+    const subjectSelect = document.getElementById('subject-select');
+    
+    const infoBox = document.getElementById('subject-info-box');
+    const infoText = document.getElementById('subject-info-text');
+    const countBadge = document.getElementById('student-count-badge');
+    const zeroWarning = document.getElementById('zero-warning');
+    const startBtn = document.getElementById('start-btn');
+
+    const activeBanner = document.getElementById('active-banner');
+    const activeSubTitle = document.getElementById('active-sub-title');
+    const activeSubInfo = document.getElementById('active-sub-info');
+    const activeLiveLink = document.getElementById('active-live-link');
+    const activeStopBtn = document.getElementById('active-stop-btn');
+
+    let teacherSubjects = [];
+    let activeLectureObj = null;
+    let selectedSubject = null;
+
+    async function init() {
+      if (!session) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // 1. Fetch teacher subjects
+        const qSubjects = query(collection(db, 'subjects'), where('teacherId', '==', session.id));
+        const subjectsSnap = await getDocs(qSubjects);
+        teacherSubjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // 2. Check for active lectures
+        const qActive = query(
+          collection(db, 'lectures'),
+          where('teacherId', '==', session.id),
+          where('status', '==', 'active')
+        );
+        const activeSnap = await getDocs(qActive);
+
+        if (!activeSnap.empty) {
+          activeLectureObj = { id: activeSnap.docs[0].id, ...activeSnap.docs[0].data() };
+          renderActiveBanner(activeLectureObj);
+        } else {
+          activeBanner.style.display = 'none';
+        }
+
+        populateClasses();
+
+        // Check if pre-selected subject passed in query string ?subject=ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const preSel = urlParams.get('subject');
+        if (preSel) {
+          const preSub = teacherSubjects.find(s => s.id === preSel);
+          if (preSub) {
+            classSelect.value = preSub.class;
+            onClassChange();
+            divisionSelect.value = preSub.division;
+            onDivisionChange();
+            subjectSelect.value = preSub.id;
+            onSubjectChange();
+          }
+        }
+
+      } catch (err) {
+        console.error("Start lecture init error:", err);
+        errorAlert.textContent = "Failed to load page: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    function renderActiveBanner(lecture) {
+      activeSubTitle.textContent = `${lecture.subjectName} (${lecture.class}-${lecture.division})`;
+      activeSubInfo.textContent = `Date: ${lecture.date} | Started at: ${lecture.startTime}`;
+      activeLiveLink.href = `attendance.html?lecture=${lecture.id}`;
+      activeBanner.style.display = 'flex';
+
+      // Disable starting new lecture
+      startBtn.disabled = true;
+      startBtn.textContent = '⛔ Active Lecture Already Running';
+    }
+
+    activeStopBtn.addEventListener('click', async () => {
+      if (!activeLectureObj) return;
+      if (!confirm(`Stop active lecture for "${activeLectureObj.subjectName}"? Unmarked students will be marked absent.`)) return;
+
+      try {
+        await stopLecture(activeLectureObj);
+        toast("Lecture stopped successfully.", "success");
+        activeLectureObj = null;
+        activeBanner.style.display = 'none';
+        startBtn.textContent = '▶️ Start Lecture Session';
+        if (selectedSubject) startBtn.disabled = false;
+      } catch (err) {
+        toast("Error stopping lecture: " + err.message, "danger");
+      }
+    });
+
+    function populateClasses() {
+      const classes = [...new Set(teacherSubjects.map(s => s.class))].sort();
+      classSelect.innerHTML = `<option value="">-- Select Class --</option>` +
+        classes.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    }
+
+    classSelect.addEventListener('change', onClassChange);
+
+    function onClassChange() {
+      const selectedClass = classSelect.value;
+      divisionSelect.innerHTML = `<option value="">-- Select Division --</option>`;
+      subjectSelect.innerHTML = `<option value="">-- Select Subject --</option>`;
+      divisionSelect.disabled = !selectedClass;
+      subjectSelect.disabled = true;
+      resetSubjectInfo();
+
+      if (!selectedClass) return;
+
+      const divs = [...new Set(teacherSubjects.filter(s => s.class === selectedClass).map(s => s.division))].sort();
+      divisionSelect.innerHTML = `<option value="">-- Select Division --</option>` +
+        divs.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    }
+
+    divisionSelect.addEventListener('change', onDivisionChange);
+
+    function onDivisionChange() {
+      const selectedClass = classSelect.value;
+      const selectedDiv = divisionSelect.value;
+
+      subjectSelect.innerHTML = `<option value="">-- Select Subject --</option>`;
+      subjectSelect.disabled = !selectedDiv;
+      resetSubjectInfo();
+
+      if (!selectedClass || !selectedDiv) return;
+
+      const subs = teacherSubjects.filter(s => s.class === selectedClass && s.division === selectedDiv);
+      subjectSelect.innerHTML = `<option value="">-- Select Subject --</option>` +
+        subs.map(s => `<option value="${s.id}">${esc(s.name)} (Sem ${esc(s.semester)})</option>`).join('');
+    }
+
+    subjectSelect.addEventListener('change', onSubjectChange);
+
+    function onSubjectChange() {
+      const subId = subjectSelect.value;
+      resetSubjectInfo();
+
+      if (!subId) return;
+
+      selectedSubject = teacherSubjects.find(s => s.id === subId);
+      if (!selectedSubject) return;
+
+      const studentCount = (selectedSubject.studentIds || []).length;
+
+      infoText.innerHTML = `Subject: <strong>${esc(selectedSubject.name)}</strong> (Class ${esc(selectedSubject.class)}-${esc(selectedSubject.division)}, Sem ${esc(selectedSubject.semester)})`;
+      countBadge.textContent = `${studentCount} Students Enrolled`;
+      infoBox.style.display = 'flex';
+
+      if (studentCount === 0) {
+        zeroWarning.style.display = 'flex';
+      } else {
+        zeroWarning.style.display = 'none';
+      }
+
+      if (!activeLectureObj) {
+        startBtn.disabled = false;
+      }
+    }
+
+    function resetSubjectInfo() {
+      selectedSubject = null;
+      infoBox.style.display = 'none';
+      zeroWarning.style.display = 'none';
+      if (!activeLectureObj) {
+        startBtn.disabled = true;
+      }
+    }
+
+    document.getElementById('start-lecture-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedSubject) return;
+      if (activeLectureObj) {
+        toast("You already have an active lecture session.", "warning");
+        return;
+      }
+
+      startBtn.disabled = true;
+      startBtn.innerHTML = 'Starting Session...';
+
+      try {
+        const lectureId = await startLecture(selectedSubject, session);
+        toast("Lecture started! Redirecting to live console...", "success");
+        setTimeout(() => {
+          window.location.href = `attendance.html?lecture=${lectureId}`;
+        }, 500);
+      } catch (err) {
+        console.error("Start lecture failed:", err);
+        toast("Failed to start lecture: " + err.message, "danger");
+        startBtn.disabled = false;
+        startBtn.innerHTML = '▶️ Start Lecture Session';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

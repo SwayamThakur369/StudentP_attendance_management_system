@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .live-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background-color: var(--success);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .status-not-marked {
+      background-color: var(--muted-badge-bg);
+      color: var(--muted-badge-text);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- TEACHER VIEW CONTAINER -->
+        <div id="teacher-view" style="display: none;">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Live Attendance Console</h1>
+              <p class="page-subtitle">Real-time attendance monitor &amp; lecture management.</p>
+            </div>
+            <div style="min-width: 260px;">
+              <select id="lecture-select" class="form-select">
+                <option value="">Loading lectures...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Lecture Header Banner -->
+          <div class="card" id="lecture-header-card" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.3rem;">
+                  <h2 id="lect-subject-title" style="font-size: 1.4rem; color: var(--primary); margin: 0;">--</h2>
+                  <span id="lect-status-badge"></span>
+                </div>
+                <p id="lect-sub-info" style="color: var(--text-muted); font-size: 0.9rem;">Date: -- | Started: -- | Ended: --</p>
+              </div>
+              <div>
+                <button id="teacher-stop-btn" class="btn btn-danger btn-lg" style="display: none;">⛔ Stop Lecture</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Stat Cards -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-info">
+                <div class="stat-label">Total Enrolled</div>
+                <div class="stat-value" id="stat-total">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card accent-success">
+              <div class="stat-icon">✅</div>
+              <div class="stat-info">
+                <div class="stat-label">Present</div>
+                <div class="stat-value" id="stat-present">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card accent-danger">
+              <div class="stat-icon">❌</div>
+              <div class="stat-info">
+                <div class="stat-label">Absent</div>
+                <div class="stat-value" id="stat-absent">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">⏳</div>
+              <div class="stat-info">
+                <div class="stat-label">Not Marked</div>
+                <div class="stat-value" id="stat-not-marked">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card accent-amber">
+              <div class="stat-icon">📊</div>
+              <div class="stat-info">
+                <div class="stat-label">Attendance %</div>
+                <div class="stat-value" id="stat-pct">0%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Students Attendance Live Table -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Student Attendance Live Sheet</h3>
+              <input type="text" id="teacher-search" class="form-control" placeholder="Search student name or roll no..." style="max-width: 280px;">
+            </div>
+
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Roll No</th>
+                    <th>Student Name</th>
+                    <th>Status</th>
+                    <th>Marked Time</th>
+                  </tr>
+                </thead>
+                <tbody id="teacher-table-tbody">
+                  <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted);">Select a lecture to view live attendance sheet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- STUDENT VIEW CONTAINER -->
+        <div id="student-view" style="display: none;">
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Mark Attendance</h1>
+              <p class="page-subtitle">Mark presence for active live class sessions.</p>
+            </div>
+          </div>
+
+          <div id="student-lectures-container">
+            <p style="color: var(--text-muted);">Listening for active live lectures...</p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      getSession,
+      mountShell,
+      db,
+      collection,
+      doc,
+      getDoc,
+      getDocs,
+      query,
+      where,
+      onSnapshot,
+      stopLecture,
+      markPresent,
+      getStudents,
+      percent,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    let role = (session && session.role) ? session.role : 'teacher';
+    const errorAlert = document.getElementById('error-alert');
+
+    // Immediately display the view based on current role (never show a blank screen)
+    if (role === 'teacher') {
+      document.getElementById('teacher-view').style.display = 'block';
+    } else {
+      document.getElementById('student-view').style.display = 'block';
+    }
+
+    // Mount shell asynchronously and confirm session
+    mountShell('any', 'live-attendance').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        role = session.role;
+        if (role === 'teacher') {
+          document.getElementById('teacher-view').style.display = 'block';
+          document.getElementById('student-view').style.display = 'none';
+          initTeacherView();
+        } else {
+          document.getElementById('teacher-view').style.display = 'none';
+          document.getElementById('student-view').style.display = 'block';
+          initStudentView();
+        }
+      }
+    });
+
+    if (session && session.id) {
+      if (role === 'teacher') {
+        initTeacherView();
+      } else {
+        initStudentView();
+      }
+    }
+
+    // ==========================================
+    // TEACHER LIVE MONITOR IMPLEMENTATION
+    // ==========================================
+    let teacherLectures = [];
+    let currentLectureId = null;
+    let lectureUnsub = null;
+    let attendanceUnsub = null;
+    let currentLectureData = null;
+    let currentEnrolledStudents = [];
+    let currentAttendanceMap = new Map();
+
+    const lectureSelect = document.getElementById('lecture-select');
+    const teacherStopBtn = document.getElementById('teacher-stop-btn');
+    const teacherSearch = document.getElementById('teacher-search');
+
+    async function initTeacherView() {
+      try {
+        const q = query(collection(db, 'lectures'), where('teacherId', '==', session.id));
+        const snap = await getDocs(q);
+        
+        teacherLectures = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort newest first
+        teacherLectures.sort((a, b) => (b.startedAtMs || 0) - (a.startedAtMs || 0));
+
+        if (teacherLectures.length === 0) {
+          lectureSelect.innerHTML = `<option value="">No lectures found</option>`;
+          document.getElementById('teacher-table-tbody').innerHTML = `
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No lectures created yet. <a href="start-lecture.html">Start your first lecture</a>.</td></tr>
+          `;
+          return;
+        }
+
+        lectureSelect.innerHTML = teacherLectures.map(l => `
+          <option value="${l.id}">
+            ${esc(l.subjectName)} (${esc(l.date)} - ${l.status === 'active' ? '🔴 Live' : 'Closed'})
+          </option>
+        `).join('');
+
+        // Determine default selected lecture ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlLectId = urlParams.get('lecture');
+
+        if (urlLectId && teacherLectures.some(l => l.id === urlLectId)) {
+          currentLectureId = urlLectId;
+        } else {
+          const activeLect = teacherLectures.find(l => l.status === 'active');
+          currentLectureId = activeLect ? activeLect.id : teacherLectures[0].id;
+        }
+
+        lectureSelect.value = currentLectureId;
+        attachRealtimeListeners(currentLectureId);
+
+      } catch (err) {
+        console.error("Teacher view init error:", err);
+        errorAlert.textContent = "Failed to load lectures: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    lectureSelect.addEventListener('change', () => {
+      currentLectureId = lectureSelect.value;
+      if (currentLectureId) attachRealtimeListeners(currentLectureId);
+    });
+
+    teacherSearch.addEventListener('input', () => renderTeacherTable());
+
+    let subjectUnsub = null;
+
+    function attachRealtimeListeners(lectureId) {
+      if (lectureUnsub) lectureUnsub();
+      if (attendanceUnsub) attendanceUnsub();
+      if (subjectUnsub) subjectUnsub();
+
+      // 1. Listen to lecture doc
+      lectureUnsub = onSnapshot(doc(db, 'lectures', lectureId), async (snap) => {
+        if (!snap.exists()) return;
+        const prevSubjectId = currentLectureData?.subjectId;
+        currentLectureData = { id: snap.id, ...snap.data() };
+        renderLectureHeader(currentLectureData);
+
+        // If subject changed or first load, listen to subject doc for real-time roster updates
+        if (currentLectureData.subjectId && currentLectureData.subjectId !== prevSubjectId) {
+          if (subjectUnsub) subjectUnsub();
+          subjectUnsub = onSnapshot(doc(db, 'subjects', currentLectureData.subjectId), async (subSnap) => {
+            if (subSnap.exists()) {
+              const studentIds = subSnap.data().studentIds || [];
+              currentEnrolledStudents = await getStudents(studentIds);
+            } else {
+              currentEnrolledStudents = [];
+            }
+            renderTeacherStatsAndTable();
+          });
+        } else {
+          renderTeacherStatsAndTable();
+        }
+      });
+
+      // 2. Listen to attendance collection in real time
+      const attQ = query(collection(db, 'attendance'), where('lectureId', '==', lectureId));
+      attendanceUnsub = onSnapshot(attQ, (snap) => {
+        currentAttendanceMap.clear();
+        snap.forEach(d => {
+          const data = d.data();
+          currentAttendanceMap.set(data.studentId, data);
+        });
+
+        renderTeacherStatsAndTable();
+      });
+    }
+
+    function renderLectureHeader(lecture) {
+      document.getElementById('lect-subject-title').textContent = `${lecture.subjectName} (${lecture.class}-${lecture.division})`;
+      document.getElementById('lect-sub-info').textContent = `Date: ${lecture.date} | Started: ${lecture.startTime} | Ended: ${lecture.endTime || 'Running...'}`;
+      
+      const statusBadge = document.getElementById('lect-status-badge');
+      if (lecture.status === 'active') {
+        statusBadge.innerHTML = `<span class="badge badge-success"><span class="live-dot"></span>Active / Live</span>`;
+        teacherStopBtn.style.display = 'inline-flex';
+      } else {
+        statusBadge.innerHTML = `<span class="badge badge-secondary">Closed</span>`;
+        teacherStopBtn.style.display = 'none';
+      }
+    }
+
+    teacherStopBtn.addEventListener('click', async () => {
+      if (!currentLectureData || currentLectureData.status !== 'active') return;
+      if (!confirm(`Are you sure you want to stop the lecture for "${currentLectureData.subjectName}"?`)) return;
+
+      try {
+        await stopLecture(currentLectureData);
+        toast("Lecture stopped successfully.", "success");
+      } catch (err) {
+        toast("Error stopping lecture: " + err.message, "danger");
+      }
+    });
+
+    function getCombinedStudentList() {
+      const map = new Map();
+      (currentEnrolledStudents || []).forEach(st => {
+        map.set(st.id, {
+          id: st.id,
+          rollNo: st.rollNo || '',
+          name: st.name || 'Student'
+        });
+      });
+
+      currentAttendanceMap.forEach((att, studentId) => {
+        if (!map.has(studentId)) {
+          map.set(studentId, {
+            id: studentId,
+            rollNo: att.rollNo || '',
+            name: att.studentName || 'Student'
+          });
+        }
+      });
+
+      const list = Array.from(map.values());
+      list.sort((a, b) => (a.rollNo || '').localeCompare(b.rollNo || '', undefined, { numeric: true }));
+      return list;
+    }
+
+    function renderTeacherStatsAndTable() {
+      if (!currentLectureData) return;
+
+      const allStudents = getCombinedStudentList();
+      const total = Math.max(currentEnrolledStudents.length, allStudents.length);
+      let presentCount = 0;
+      let absentCount = 0;
+      let notMarkedCount = 0;
+
+      const isActive = currentLectureData.status === 'active';
+
+      allStudents.forEach(st => {
+        const att = currentAttendanceMap.get(st.id);
+        if (att) {
+          if (att.status === 'present') presentCount++;
+          else if (att.status === 'absent') absentCount++;
+        } else {
+          if (isActive) notMarkedCount++;
+          else absentCount++;
+        }
+      });
+
+      const pct = percent(presentCount, total);
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-present').textContent = presentCount;
+      document.getElementById('stat-absent').textContent = absentCount;
+      document.getElementById('stat-not-marked').textContent = notMarkedCount;
+      document.getElementById('stat-pct').textContent = `${pct}%`;
+
+      renderTeacherTable(allStudents);
+    }
+
+    function renderTeacherTable(allStudents) {
+      const tbody = document.getElementById('teacher-table-tbody');
+      if (!tbody) return;
+
+      const students = allStudents || getCombinedStudentList();
+      const filter = teacherSearch.value.trim().toLowerCase();
+      const isActive = currentLectureData ? currentLectureData.status === 'active' : false;
+
+      let list = students;
+      if (filter) {
+        list = list.filter(st => 
+          (st.name || '').toLowerCase().includes(filter) || 
+          (st.rollNo || '').toLowerCase().includes(filter)
+        );
+      }
+
+      if (list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              ${filter ? 'No matching students.' : (isActive ? 'No attendance marked yet and no students enrolled.' : 'No students found.')}
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(st => {
+        const att = currentAttendanceMap.get(st.id);
+        let statusHtml = "";
+        let timeText = "-";
+
+        if (att) {
+          timeText = esc(att.markedAt || '-');
+          if (att.status === 'present') {
+            statusHtml = `<span class="badge badge-success">Present</span>`;
+          } else {
+            statusHtml = `<span class="badge badge-danger">Absent</span>`;
+          }
+        } else {
+          if (isActive) {
+            statusHtml = `<span class="badge status-not-marked">Not Marked</span>`;
+          } else {
+            statusHtml = `<span class="badge badge-danger">Absent</span>`;
+          }
+        }
+
+        return `
+          <tr>
+            <td><strong>${esc(st.rollNo || '-')}</strong></td>
+            <td>${esc(st.name)}</td>
+            <td>${statusHtml}</td>
+            <td>${timeText}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // STUDENT MARK ATTENDANCE IMPLEMENTATION
+    // ==========================================
+    let enrolledSubjectIds = [];
+    let activeLecturesMap = new Map();
+    let studentAttMap = new Map();
+    let activeUnsubscribers = [];
+
+    async function initStudentView() {
+      try {
+        // 1. Fetch subjects enrolled by student
+        const subQ = query(collection(db, 'subjects'), where('studentIds', 'array-contains', session.id));
+        const subSnap = await getDocs(subQ);
+        const enrolledSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        enrolledSubjectIds = enrolledSubjects.map(s => s.id);
+
+        if (enrolledSubjectIds.length === 0) {
+          document.getElementById('student-lectures-container').innerHTML = `
+            <div class="card" style="text-align: center; padding: 2rem;">
+              <p style="color: var(--text-muted);">You are not enrolled in any subjects currently.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // 2. Listen to student's attendance records in real time
+        const attQ = query(collection(db, 'attendance'), where('studentId', '==', session.id));
+        onSnapshot(attQ, (snap) => {
+          studentAttMap.clear();
+          snap.forEach(d => {
+            const data = d.data();
+            studentAttMap.set(data.lectureId, data);
+          });
+          renderStudentLecturesCards(enrolledSubjects);
+        });
+
+        // 3. Listen to active lectures for each enrolled subject
+        enrolledSubjects.forEach(sub => {
+          const lectQ = query(
+            collection(db, 'lectures'),
+            where('subjectId', '==', sub.id),
+            where('status', '==', 'active')
+          );
+
+          const unsub = onSnapshot(lectQ, (snap) => {
+            activeLecturesMap.delete(sub.id);
+            snap.forEach(d => {
+              activeLecturesMap.set(sub.id, { id: d.id, ...d.data() });
+            });
+
+            renderStudentLecturesCards(enrolledSubjects);
+          });
+
+          activeUnsubscribers.push(unsub);
+        });
+
+      } catch (err) {
+        console.error("Student view error:", err);
+        errorAlert.textContent = "Failed to initialize student portal: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    function renderStudentLecturesCards(enrolledSubjects) {
+      const container = document.getElementById('student-lectures-container');
+      const activeList = Array.from(activeLecturesMap.values());
+
+      if (activeList.length === 0) {
+        container.innerHTML = `
+          <div class="card" style="text-align: center; padding: 2.5rem;">
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">📡</div>
+            <h3 style="color: var(--primary); margin-bottom: 0.5rem;">No Lecture Running</h3>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">There are currently no active live lectures for your enrolled subjects.</p>
+            <button class="btn btn-ghost" disabled style="opacity: 0.6; cursor: not-allowed;">
+              ✅ Mark Present
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = activeList.map(lecture => {
+        const attRecord = studentAttMap.get(lecture.id);
+        const isPresent = attRecord && attRecord.status === 'present';
+
+        return `
+          <div class="card" style="margin-bottom: 1.25rem; border-left: 4px solid ${isPresent ? 'var(--success)' : 'var(--amber-accent)'};">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <span class="badge badge-success" style="margin-bottom: 0.4rem;">
+                  <span class="live-dot"></span> Live Lecture
+                </span>
+                <h3 style="font-size: 1.35rem; color: var(--primary);">${esc(lecture.subjectName)}</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+                  Teacher: <strong>${esc(lecture.teacherName)}</strong> &bull; Class: <strong>${esc(lecture.class)}-${esc(lecture.division)}</strong>
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
+                  Date: ${esc(lecture.date)} | Started at: ${esc(lecture.startTime)}
+                </p>
+              </div>
+
+              <div>
+                ${isPresent ? `
+                  <button class="btn btn-success btn-lg" disabled style="cursor: default; opacity: 0.9;">
+                    ✅ Present (Marked at ${esc(attRecord.markedAt)})
+                  </button>
+                ` : `
+                  <button class="btn btn-success btn-lg mark-present-btn" data-id="${lecture.id}">
+                    ✅ Mark Present
+                  </button>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Attach button handler
+      document.querySelectorAll('.mark-present-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleMarkPresent(btn.dataset.id, btn));
+      });
+    }
+
+    async function handleMarkPresent(lectureId, btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = "Marking Present...";
+
+      try {
+        await markPresent(lectureId, session);
+        toast("Attendance marked successfully! Status set to Present.", "success");
+      } catch (err) {
+        console.error("Mark present error:", err);
+        toast(err.message, "danger");
+        btnEl.disabled = false;
+        btnEl.textContent = "✅ Mark Present";
+      }
+    }
+  </script>
+</body>
+</html>

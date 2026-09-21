@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Attendance Management System</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .hero-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(135deg, var(--bg-sidebar) 0%, #1e293b 100%);
+      color: #ffffff;
+    }
+    .hero-header {
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero-title {
+      font-size: 2.75rem;
+      color: #ffffff;
+      margin-bottom: 0.75rem;
+    }
+    .hero-title span {
+      color: var(--amber-accent);
+    }
+    .hero-subtitle {
+      font-size: 1.15rem;
+      color: #94a3b8;
+      font-weight: 300;
+    }
+    .cards-wrapper {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+      flex: 1;
+    }
+    .role-card {
+      background: #ffffff;
+      color: var(--text-main);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none !important;
+      border: 2px solid transparent;
+    }
+    .role-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      border-color: var(--amber-accent);
+    }
+    .role-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1.25rem;
+      width: 90px;
+      height: 90px;
+      background: var(--bg-main);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .role-title {
+      font-size: 1.5rem;
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+    }
+    .role-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.75rem;
+      line-height: 1.6;
+    }
+    .hero-footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: #64748b;
+      font-size: 0.85rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="hero-container">
+    <header class="hero-header">
+      <h1 class="hero-title">Student <span>Attendance</span> System</h1>
+      <p class="hero-subtitle">Fast, seamless, real-time attendance management for college lectures and courses.</p>
+    </header>
+
+    <main class="cards-wrapper">
+      <a href="teacher-login.html" class="role-card">
+        <div>
+          <div class="role-icon">👨‍🏫</div>
+          <h2 class="role-title">Teacher Portal</h2>
+          <p class="role-desc">Create subjects, start live lectures, track real-time attendance, and view comprehensive daily/monthly reports.</p>
+        </div>
+        <span class="btn btn-primary btn-lg btn-block">Login as Teacher →</span>
+      </a>
+
+      <a href="student-login.html" class="role-card">
+        <div>
+          <div class="role-icon">👨‍🎓</div>
+          <h2 class="role-title">Student Portal</h2>
+          <p class="role-desc">Mark live lecture attendance with a single click, monitor subject-wise presence, and view attendance history.</p>
+        </div>
+        <span class="btn btn-accent btn-lg btn-block">Login as Student →</span>
+      </a>
+    </main>
+
+    <footer class="hero-footer">
+      <p>Student Attendance Management System &bull; Built with HTML, CSS &amp; Firebase Firestore</p>
+      <p style="margin-top: 0.5rem; display: flex; justify-content: center; gap: 1rem; align-items: center;">
+        <a href="register.html" style="color: #ffffff; font-weight: 600; text-decoration: underline;">✨ Create an Account / Register</a>
+        <span style="color: #64748b;">|</span>
+        <a href="seed.html" style="color: var(--amber-accent); text-decoration: underline;">🌱 Database Setup &amp; Demo Data Generator</a>
+      </p>
+    </footer>
+
+  </div>
+</body>
+</html>

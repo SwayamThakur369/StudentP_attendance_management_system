@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .split-container {
+      display: flex;
+      min-height: 100vh;
+      background: var(--bg-main);
+    }
+    .split-navy-panel {
+      flex: 1;
+      background: linear-gradient(135deg, var(--bg-sidebar) 0%, #1e293b 100%);
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .split-navy-panel::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 50%;
+      top: -50px;
+      right: -50px;
+    }
+    .brand-title {
+      font-size: 2.25rem;
+      color: #ffffff;
+      margin-bottom: 1rem;
+    }
+    .brand-title span {
+      color: var(--amber-accent);
+    }
+    .brand-subtitle {
+      font-size: 1.05rem;
+      color: #94a3b8;
+      line-height: 1.6;
+      max-width: 440px;
+    }
+    .split-form-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem;
+      background: #ffffff;
+    }
+    .form-wrapper {
+      width: 100%;
+      max-width: 440px;
+    }
+    .form-header {
+      margin-bottom: 1.5rem;
+    }
+    .form-title {
+      font-size: 1.8rem;
+      color: var(--primary);
+      margin-bottom: 0.4rem;
+    }
+    .form-subtext {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .role-toggle-container {
+      display: flex;
+      background: var(--bg-main);
+      padding: 0.25rem;
+      border-radius: var(--radius-sm);
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .role-toggle-btn {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      border: none;
+      background: transparent;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .role-toggle-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    @media (max-width: 850px) {
+      .split-container {
+        flex-direction: column;
+      }
+      .split-navy-panel {
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+      }
+      .brand-subtitle {
+        margin: 0 auto;
+      }
+      .split-form-panel {
+        padding: 2rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="split-container">
+    <div class="split-navy-panel">
+      <div>
+        <h1 class="brand-title">Create <span>Account</span></h1>
+        <p class="brand-subtitle">Join the Student Attendance System to manage subjects, start live lectures, or track your attendance percentage.</p>
+      </div>
+    </div>
+
+    <div class="split-form-panel">
+      <div class="form-wrapper">
+        <div class="form-header">
+          <h2 class="form-title">Self Registration</h2>
+          <p class="form-subtext">Choose your role to get started</p>
+        </div>
+
+        <!-- Role Toggle Switch -->
+        <div class="role-toggle-container">
+          <button type="button" id="toggle-student" class="role-toggle-btn active">👨‍🎓 Student</button>
+          <button type="button" id="toggle-teacher" class="role-toggle-btn">👨‍🏫 Teacher</button>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <form id="register-form" novalidate>
+          <input type="hidden" id="selected-role" value="student">
+
+          <!-- Common / Student Fields -->
+          <div id="student-fields">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div class="form-group">
+                <label class="form-label" for="rollNo">Roll Number *</label>
+                <input type="text" id="rollNo" class="form-control" placeholder="e.g. 101">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="student-name">Full Name *</label>
+                <input type="text" id="student-name" class="form-control" placeholder="e.g. Aarav Sharma">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div class="form-group">
+                <label class="form-label" for="student-class">Class / Year *</label>
+                <select id="student-class" class="form-select">
+                  <option value="">-- Select Year --</option>
+                  <option value="FE">First Year (FE)</option>
+                  <option value="SE">Second Year (SE)</option>
+                  <option value="TE">Third Year (TE)</option>
+                  <option value="BE">Final Year (BE)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="student-div">Division *</label>
+                <select id="student-div" class="form-select">
+                  <option value="">-- Select Div --</option>
+                  <option value="A">Division A</option>
+                  <option value="B">Division B</option>
+                  <option value="C">Division C</option>
+                  <option value="D">Division D</option>
+                </select>
+              </div>
+            </div>
+
+
+            <div class="form-group">
+              <label class="form-label" for="student-email">Email Address *</label>
+              <input type="email" id="student-email" class="form-control" placeholder="student@college.edu">
+            </div>
+          </div>
+
+          <!-- Teacher Fields -->
+          <div id="teacher-fields" style="display: none;">
+            <div class="form-group">
+              <label class="form-label" for="teacher-name">Full Name *</label>
+              <input type="text" id="teacher-name" class="form-control" placeholder="e.g. Prof. Anjali Sharma">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="teacher-email">College Email *</label>
+              <input type="email" id="teacher-email" class="form-control" placeholder="teacher@college.edu">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="access-code">Teacher Access Code *</label>
+              <input type="text" id="access-code" class="form-control" placeholder="Enter access code (e.g. TEACH2026)">
+            </div>
+          </div>
+
+          <!-- Shared Password Fields -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label" for="password">Password *</label>
+              <input type="password" id="password" class="form-control" placeholder="Min 6 chars" required minlength="6">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="confirm-password">Confirm Password *</label>
+              <input type="password" id="confirm-password" class="form-control" placeholder="Re-enter password" required minlength="6">
+            </div>
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn btn-primary btn-lg btn-block" style="margin-top: 1.25rem;">
+            Register as Student
+          </button>
+        </form>
+
+        <div style="margin-top: 1.75rem; text-align: center; font-size: 0.875rem;">
+          <span style="color: var(--text-muted);">Already have an account?</span>
+          <a id="login-link" href="student-login.html" style="color: var(--primary); font-weight: 600; margin-left: 0.3rem;">Log in here</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { registerStudent, registerTeacher } from './js/app.js';
+
+    const toggleStudent = document.getElementById('toggle-student');
+    const toggleTeacher = document.getElementById('toggle-teacher');
+    const roleInput = document.getElementById('selected-role');
+
+    const studentFields = document.getElementById('student-fields');
+    const teacherFields = document.getElementById('teacher-fields');
+    const submitBtn = document.getElementById('submit-btn');
+    const loginLink = document.getElementById('login-link');
+    const errorAlert = document.getElementById('error-alert');
+
+    const form = document.getElementById('register-form');
+
+    function setRole(role) {
+      errorAlert.style.display = 'none';
+      roleInput.value = role;
+
+      if (role === 'student') {
+        toggleStudent.classList.add('active');
+        toggleTeacher.classList.remove('active');
+        studentFields.style.display = 'block';
+        teacherFields.style.display = 'none';
+        submitBtn.className = 'btn btn-accent btn-lg btn-block';
+        submitBtn.textContent = 'Register as Student';
+        loginLink.href = 'student-login.html';
+      } else {
+        toggleTeacher.classList.add('active');
+        toggleStudent.classList.remove('active');
+        teacherFields.style.display = 'block';
+        studentFields.style.display = 'none';
+        submitBtn.className = 'btn btn-primary btn-lg btn-block';
+        submitBtn.textContent = 'Register as Teacher';
+        loginLink.href = 'teacher-login.html';
+      }
+    }
+
+    toggleStudent.addEventListener('click', () => setRole('student'));
+    toggleTeacher.addEventListener('click', () => setRole('teacher'));
+
+    function validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorAlert.style.display = 'none';
+
+      const role = roleInput.value;
+      const pass = document.getElementById('password').value.trim();
+      const confirmPass = document.getElementById('confirm-password').value.trim();
+
+      if (pass.length < 6) {
+        errorAlert.textContent = 'Password must be at least 6 characters long.';
+        errorAlert.style.display = 'flex';
+        return;
+      }
+
+      if (pass !== confirmPass) {
+        errorAlert.textContent = 'Passwords do not match.';
+        errorAlert.style.display = 'flex';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating Account...';
+
+      try {
+        if (role === 'student') {
+          const rollNo = document.getElementById('rollNo').value.trim();
+          const name = document.getElementById('student-name').value.trim();
+          const className = document.getElementById('student-class').value.trim();
+          const division = document.getElementById('student-div').value.trim();
+          const email = document.getElementById('student-email').value.trim();
+
+          if (!rollNo || !name || !className || !division || !email) {
+            errorAlert.textContent = 'Please fill in all student fields.';
+            errorAlert.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Register as Student';
+            return;
+          }
+
+          if (!validateEmail(email)) {
+            errorAlert.textContent = 'Please enter a valid email address.';
+            errorAlert.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Register as Student';
+            return;
+          }
+
+          const res = await registerStudent({ rollNo, name, class: className, division, email, password: pass });
+          if (res.ok) {
+            window.location.href = 'verify-email.html';
+          } else {
+            errorAlert.textContent = res.error || 'Registration failed.';
+            errorAlert.style.display = 'flex';
+          }
+
+        } else {
+          // Teacher registration
+          const name = document.getElementById('teacher-name').value.trim();
+          const email = document.getElementById('teacher-email').value.trim();
+          const accessCode = document.getElementById('access-code').value.trim();
+
+          if (!name || !email || !accessCode) {
+            errorAlert.textContent = 'Please fill in all teacher fields including the access code.';
+            errorAlert.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Register as Teacher';
+            return;
+          }
+
+          if (!validateEmail(email)) {
+            errorAlert.textContent = 'Please enter a valid email address.';
+            errorAlert.style.display = 'flex';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Register as Teacher';
+            return;
+          }
+
+          const res = await registerTeacher({ name, email, password: pass, accessCode });
+          if (res.ok) {
+            window.location.href = 'verify-email.html';
+          } else {
+            errorAlert.textContent = res.error || 'Registration failed.';
+            errorAlert.style.display = 'flex';
+          }
+        }
+      } catch (err) {
+        console.error("Registration error:", err);
+        errorAlert.textContent = 'Unable to connect to database. Please check your network and try again.';
+        errorAlert.style.display = 'flex';
+      } finally {
+        submitBtn.disabled = false;
+        if (role === 'student') submitBtn.textContent = 'Register as Student';
+        else submitBtn.textContent = 'Register as Teacher';
+      }
+    });
+  </script>
+</body>
+</html>

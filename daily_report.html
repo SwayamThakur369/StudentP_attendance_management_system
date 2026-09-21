@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Attendance Report - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          🎓 Student<span class="accent">AMS</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher-dashboard.html" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+        <a href="teacher-subjects.html" class="nav-item"><span>📚</span><span>Subjects</span></a>
+        <a href="teacher-students.html" class="nav-item"><span>👥</span><span>Students</span></a>
+        <a href="teacher-start-lecture.html" class="nav-item"><span>▶️</span><span>Start Lecture</span></a>
+        <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
+        <a href="teacher-daily-report.html" class="nav-item active"><span>📅</span><span>Daily Report</span></a>
+        <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn btn-ghost btn-block" style="color: #cbd5e1; justify-content: flex-start; gap: 0.75rem;">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+          <h1 class="topbar-title">Student Attendance Management System</h1>
+        </div>
+        <div class="topbar-user">
+          <div class="user-badge">
+            <span class="user-name">Teacher</span>
+            <span class="user-role">teacher</span>
+          </div>
+          <div class="avatar-circle">T</div>
+        </div>
+      </header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Daily Attendance Report</h1>
+            <p class="page-subtitle">View and download daily attendance logs across your subjects.</p>
+          </div>
+          <div>
+            <button id="download-csv-btn" class="btn btn-primary">📥 Download CSV Report</button>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Filters Panel -->
+        <div class="panel">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; align-items: end;">
+            
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="report-date">Select Date</label>
+              <input type="date" id="report-date" class="form-control">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="subject-filter">Subject</label>
+              <select id="subject-filter" class="form-select">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="class-filter">Class</label>
+              <select id="class-filter" class="form-select">
+                <option value="">All Classes</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="div-filter">Division</label>
+              <select id="div-filter" class="form-select">
+                <option value="">All Divisions</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="status-filter">Status</label>
+              <select id="status-filter" class="form-select">
+                <option value="">All Statuses</option>
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="search-input">Search Student</label>
+              <input type="text" id="search-input" class="form-control" placeholder="Search name or roll no...">
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Summary Stat Cards -->
+        <div class="stat-grid">
+          <div class="stat-card accent-success">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Present</div>
+              <div class="stat-value" id="stat-present">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-danger">
+            <div class="stat-icon">❌</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Absent</div>
+              <div class="stat-value" id="stat-absent">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Logs</div>
+              <div class="stat-value" id="stat-total">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <div class="stat-label">Day Presence %</div>
+              <div class="stat-value" id="stat-pct">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Report Table Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title" id="table-title">Daily Attendance Sheet</h2>
+            <span id="record-count-badge" class="badge badge-secondary">0 Records</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table" id="report-table">
+              <thead>
+                <tr>
+                  <th>Roll No</th>
+                  <th>Student Name</th>
+                  <th>Subject</th>
+                  <th>Date</th>
+                  <th>Marked Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="report-tbody">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading daily report...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      onAuthStateChanged,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      query,
+      where,
+      todayStr,
+      fmtDate,
+      percent,
+      downloadCSV,
+      esc,
+      toast
+    } from './js/app.js';
+
+    const datePicker = document.getElementById('report-date');
+    const subjectFilter = document.getElementById('subject-filter');
+    const classFilter = document.getElementById('class-filter');
+    const divFilter = document.getElementById('div-filter');
+    const statusFilter = document.getElementById('status-filter');
+    const searchInput = document.getElementById('search-input');
+    const downloadBtn = document.getElementById('download-csv-btn');
+    const errorAlert = document.getElementById('error-alert');
+
+    datePicker.value = todayStr();
+
+    let session = getSession();
+    let teacherSubjects = [];
+    let dailyRecords = [];
+    let filteredRecords = [];
+
+    function getTeacherId() {
+      return (session && session.id) || (auth.currentUser && auth.currentUser.uid) || null;
+    }
+
+    mountShell('teacher', 'daily-report').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        init();
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        if (!session) session = {};
+        session.id = user.uid;
+        session.role = 'teacher';
+        init();
+      }
+    });
+
+    if (session && session.id) {
+      init();
+    }
+
+    async function init() {
+      const teacherId = getTeacherId();
+      if (!teacherId) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // Fetch teacher's subjects
+        const subQ = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+        const subSnap = await getDocs(subQ);
+        teacherSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Populate Subject, Class, Division filter options
+        subjectFilter.innerHTML = `<option value="">All Subjects</option>` +
+          teacherSubjects.map(s => `<option value="${s.id}">${esc(s.name)} (${esc(s.class || '')}-${esc(s.division || '')})</option>`).join('');
+
+        const classes = [...new Set(teacherSubjects.map(s => s.class).filter(Boolean))].sort();
+        classFilter.innerHTML = `<option value="">All Classes</option>` +
+          classes.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+        const divs = [...new Set(teacherSubjects.map(s => s.division).filter(Boolean))].sort();
+        divFilter.innerHTML = `<option value="">All Divisions</option>` +
+          divs.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+
+        await loadDailyAttendance();
+
+      } catch (err) {
+        console.error("Daily report init error:", err);
+        errorAlert.textContent = "Failed to load report data: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    async function loadDailyAttendance() {
+      const selectedDate = datePicker.value;
+      if (!selectedDate) return;
+
+      errorAlert.style.display = 'none';
+      document.getElementById('table-title').textContent = `Daily Attendance Sheet (${fmtDate(selectedDate)})`;
+
+      const teacherSubjectIds = teacherSubjects.map(s => s.id);
+
+      try {
+        const attQ = query(collection(db, 'attendance'), where('date', '==', selectedDate));
+        const attSnap = await getDocs(attQ);
+
+        // Keep records for this teacher's subjects, or all if teacherSubjectIds empty
+        dailyRecords = [];
+        attSnap.forEach(d => {
+          const data = d.data();
+          if (teacherSubjectIds.length === 0 || teacherSubjectIds.includes(data.subjectId)) {
+            dailyRecords.push({ id: d.id, ...data });
+          }
+        });
+
+        applyFilters();
+      } catch (err) {
+        console.error("Load daily attendance error:", err);
+        errorAlert.textContent = "Error loading daily logs: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    [datePicker, subjectFilter, classFilter, divFilter, statusFilter, searchInput].forEach(el => {
+      el.addEventListener('change', () => {
+        if (el === datePicker) loadDailyAttendance();
+        else applyFilters();
+      });
+      if (el === searchInput) {
+        el.addEventListener('input', applyFilters);
+      }
+    });
+
+    function applyFilters() {
+      const subId = subjectFilter.value;
+      const cls = classFilter.value;
+      const div = divFilter.value;
+      const status = statusFilter.value;
+      const search = searchInput.value.trim().toLowerCase();
+
+      filteredRecords = dailyRecords.filter(r => {
+        if (subId && r.subjectId !== subId) return false;
+        
+        if (cls || div) {
+          const subObj = teacherSubjects.find(s => s.id === r.subjectId);
+          if (cls && subObj && subObj.class !== cls) return false;
+          if (div && subObj && subObj.division !== div) return false;
+        }
+
+        if (status && r.status !== status) return false;
+
+        if (search) {
+          const matchName = (r.studentName || '').toLowerCase().includes(search);
+          const matchRoll = (r.rollNo || '').toLowerCase().includes(search);
+          if (!matchName && !matchRoll) return false;
+        }
+
+        return true;
+      });
+
+      // Sort by Roll No
+      filteredRecords.sort((a, b) => (a.rollNo || '').localeCompare(b.rollNo || '', undefined, { numeric: true }));
+
+      renderReportTable();
+    }
+
+    function renderReportTable() {
+      const tbody = document.getElementById('report-tbody');
+      
+      let present = 0;
+      let absent = 0;
+
+      filteredRecords.forEach(r => {
+        if (r.status === 'present') present++;
+        else if (r.status === 'absent') absent++;
+      });
+
+      const total = filteredRecords.length;
+      const pct = percent(present, total);
+
+      document.getElementById('stat-present').textContent = present;
+      document.getElementById('stat-absent').textContent = absent;
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-pct').textContent = `${pct}%`;
+      document.getElementById('record-count-badge').textContent = `${total} Records`;
+
+      if (filteredRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No attendance records found for the selected date and filters.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filteredRecords.map(r => `
+        <tr>
+          <td><strong>${esc(r.rollNo)}</strong></td>
+          <td>${esc(r.studentName)}</td>
+          <td>${esc(r.subjectName)}</td>
+          <td>${esc(r.date)}</td>
+          <td>${esc(r.markedAt || '-')}</td>
+          <td>
+            ${r.status === 'present' ? '<span class="badge badge-success">Present</span>' : '<span class="badge badge-danger">Absent</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (filteredRecords.length === 0) {
+        toast("No data available to download.", "warning");
+        return;
+      }
+
+      const rows = filteredRecords.map(r => ({
+        "Roll No": r.rollNo,
+        "Student Name": r.studentName,
+        "Subject": r.subjectName,
+        "Date": r.date,
+        "Marked Time": r.markedAt || '',
+        "Status": r.status
+      }));
+
+      const filename = `Attendance_Report_${datePicker.value}.csv`;
+      downloadCSV(filename, rows);
+      toast("CSV file downloaded.", "success");
+    });
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .profile-avatar-large {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 2.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      font-family: var(--font-heading);
+      box-shadow: var(--shadow-md);
+    }
+    .info-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .info-item {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+    }
+    .info-item:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .info-val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">User Profile &amp; Settings</h1>
+            <p class="page-subtitle">View your account details and update your security settings.</p>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <div class="profile-grid">
+          <!-- User Info Panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Account Information</h2>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1.5rem;">
+              <div class="profile-avatar-large" id="avatar-large">U</div>
+              <h2 id="profile-name" style="font-size: 1.4rem; color: var(--primary);">Loading...</h2>
+              <span id="profile-role-badge" class="badge badge-accent" style="margin-top: 0.25rem; text-transform: capitalize;">--</span>
+            </div>
+
+            <ul class="info-list" id="info-list">
+              <li class="info-item"><span class="info-label">Loading details...</span></li>
+            </ul>
+          </div>
+
+          <!-- Change Password Panel -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Security &amp; Change Password</h2>
+            </div>
+
+            <form id="password-form">
+              <div class="form-group">
+                <label class="form-label" for="curr-password">Current Password *</label>
+                <input type="password" id="curr-password" class="form-control" placeholder="Enter current password" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="new-password">New Password *</label>
+                <input type="password" id="new-password" class="form-control" placeholder="Enter new password" required minlength="4">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="confirm-password">Confirm New Password *</label>
+                <input type="password" id="confirm-password" class="form-control" placeholder="Confirm new password" required minlength="4">
+              </div>
+
+              <div style="margin-top: 1.5rem;">
+                <button type="submit" id="save-pass-btn" class="btn btn-primary btn-block">
+                  🔒 Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      getSession,
+      mountShell,
+      db,
+      doc,
+      getDoc,
+      getDocs,
+      collection,
+      query,
+      where,
+      esc,
+      toast,
+      auth,
+      reauthenticateWithCredential,
+      EmailAuthProvider,
+      updatePassword
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('any', 'profile').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        loadProfile(session.role);
+      }
+    });
+
+    if (session && session.id) {
+      loadProfile(session.role);
+    }
+
+    let currentUserData = null;
+
+    async function loadProfile(role) {
+      errorAlert.style.display = 'none';
+
+      try {
+        const colName = role === 'teacher' ? 'teachers' : 'students';
+        const userRef = doc(db, colName, session.id);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          errorAlert.textContent = "User profile document not found.";
+          errorAlert.style.display = 'flex';
+          return;
+        }
+
+        currentUserData = userSnap.data();
+
+        const name = currentUserData.name || session.name || 'User';
+        document.getElementById('avatar-large').textContent = name.charAt(0).toUpperCase();
+        document.getElementById('profile-name').textContent = name;
+        document.getElementById('profile-role-badge').textContent = role;
+
+        const infoList = document.getElementById('info-list');
+
+        if (role === 'teacher') {
+          // Fetch number of subjects
+          const subQ = query(collection(db, 'subjects'), where('teacherId', '==', session.id));
+          const subSnap = await getDocs(subQ);
+          const subjectCount = subSnap.size;
+
+          infoList.innerHTML = `
+            <li class="info-item"><span class="info-label">Full Name</span><span class="info-val">${esc(name)}</span></li>
+            <li class="info-item"><span class="info-label">Email Address</span><span class="info-val">${esc(currentUserData.email || session.email || '-')}</span></li>
+            <li class="info-item"><span class="info-label">Subjects Taught</span><span class="info-val">${subjectCount} Subjects</span></li>
+          `;
+        } else {
+          infoList.innerHTML = `
+            <li class="info-item"><span class="info-label">Full Name</span><span class="info-val">${esc(name)}</span></li>
+            <li class="info-item"><span class="info-label">Roll Number</span><span class="info-val">${esc(currentUserData.rollNo || '-')}</span></li>
+            <li class="info-item"><span class="info-label">Class</span><span class="info-val">${esc(currentUserData.class || '-')}</span></li>
+            <li class="info-item"><span class="info-label">Division</span><span class="info-val">${esc(currentUserData.division || '-')}</span></li>
+            <li class="info-item"><span class="info-label">Email Address</span><span class="info-val">${esc(currentUserData.email || session.email || '-')}</span></li>
+          `;
+        }
+
+      } catch (err) {
+        console.error("Load profile error:", err);
+        errorAlert.textContent = "Failed to load user profile: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    document.getElementById('password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currPass = document.getElementById('curr-password').value.trim();
+      const newPass = document.getElementById('new-password').value.trim();
+      const confirmPass = document.getElementById('confirm-password').value.trim();
+
+      if (!currPass || !newPass || !confirmPass) {
+        toast("Please fill in all password fields.", "warning");
+        return;
+      }
+
+      if (newPass.length < 6) {
+        toast("New password must be at least 6 characters long.", "warning");
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        toast("New password and confirm password do not match.", "warning");
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (!user || !user.email) {
+        toast("No active authenticated user found.", "danger");
+        return;
+      }
+
+      const saveBtn = document.getElementById('save-pass-btn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Updating Password...";
+
+      try {
+        const credential = EmailAuthProvider.credential(user.email, currPass);
+        await reauthenticateWithCredential(user, credential);
+        await updatePassword(user, newPass);
+
+        toast("Password updated successfully!", "success");
+        document.getElementById('password-form').reset();
+      } catch (err) {
+        console.error("Update password error:", err);
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          toast("Incorrect current password.", "danger");
+        } else if (err.code === 'auth/weak-password') {
+          toast("New password is too weak.", "danger");
+        } else {
+          toast("Failed to update password: " + (err.message || err), "danger");
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "🔒 Update Password";
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

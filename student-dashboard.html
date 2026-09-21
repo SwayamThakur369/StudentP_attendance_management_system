@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .greeting-card {
+      background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+      color: #ffffff;
+      border-radius: var(--radius-md);
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .greeting-title {
+      font-size: 1.6rem;
+      color: #ffffff;
+      margin-bottom: 0.25rem;
+    }
+    .greeting-details {
+      color: #cbd5e1;
+      font-size: 0.925rem;
+    }
+    .low-attendance-row {
+      background-color: #fef2f2 !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <!-- Greeting Banner -->
+        <div class="greeting-card">
+          <div>
+            <h1 class="greeting-title" id="student-name">Welcome Back, Student!</h1>
+            <p class="greeting-details" id="student-details">Roll No: -- | Class: -- | Division: --</p>
+          </div>
+          <div>
+            <a href="student-mark-attendance.html" class="btn btn-accent btn-lg">✅ Mark Attendance</a>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Stat Cards -->
+        <div class="stat-grid">
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <div class="stat-label">Overall Attendance</div>
+              <div class="stat-value" id="stat-overall-pct">0%</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-success">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <div class="stat-label">Lectures Attended</div>
+              <div class="stat-value" id="stat-attended">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-danger">
+            <div class="stat-icon">❌</div>
+            <div class="stat-info">
+              <div class="stat-label">Lectures Missed</div>
+              <div class="stat-value" id="stat-missed">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">📚</div>
+            <div class="stat-info">
+              <div class="stat-label">Enrolled Subjects</div>
+              <div class="stat-value" id="stat-enrolled-subjects">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Lecture / Mark Attendance Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Active Live Lectures</h2>
+            <span id="active-count-badge"></span>
+          </div>
+          <div id="active-lecture-content">
+            <p style="color: var(--text-muted);">Checking for ongoing lectures...</p>
+          </div>
+        </div>
+
+        <!-- Subject-Wise Attendance Breakdown Table -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Subject-Wise Attendance Breakdown</h2>
+          </div>
+          <div class="table-responsive">
+            <table class="table" id="attendance-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Total Lectures</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Percentage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-tbody">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">Loading subject breakdown...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      getDoc,
+      doc,
+      query,
+      where,
+      percent,
+      MIN_PERCENT,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('student', 'dashboard').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        loadStudentDashboard();
+      }
+    });
+
+    if (session && session.id) {
+      loadStudentDashboard();
+    }
+
+    async function loadStudentDashboard() {
+      if (!session) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // 1. Fetch student doc for full details
+        const stSnap = await getDoc(doc(db, 'students', session.id));
+        const studentData = stSnap.exists() ? stSnap.data() : session;
+
+        document.getElementById('student-name').textContent = `Welcome, ${studentData.name || session.name}!`;
+        document.getElementById('student-details').textContent = 
+          `Roll No: ${studentData.rollNo || session.rollNo || '--'} | Class: ${studentData.class || '--'} | Division: ${studentData.division || '--'}`;
+
+        // 2. Fetch enrolled subjects (where studentIds array-contains student.id)
+        const subjectsQ = query(collection(db, 'subjects'), where('studentIds', 'array-contains', session.id));
+        const subjectsSnap = await getDocs(subjectsQ);
+        const enrolledSubjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        document.getElementById('stat-enrolled-subjects').textContent = enrolledSubjects.length;
+
+        // 3. Fetch all attendance records for this student
+        const attQ = query(collection(db, 'attendance'), where('studentId', '==', session.id));
+        const attSnap = await getDocs(attQ);
+        const attendanceRecords = attSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        let totalAttended = 0;
+        let totalMissed = 0;
+
+        attendanceRecords.forEach(r => {
+          if (r.status === 'present') totalAttended++;
+          else if (r.status === 'absent') totalMissed++;
+        });
+
+        const totalLectures = totalAttended + totalMissed;
+        const overallPct = percent(totalAttended, totalLectures);
+
+        document.getElementById('stat-attended').textContent = totalAttended;
+        document.getElementById('stat-missed').textContent = totalMissed;
+        document.getElementById('stat-overall-pct').textContent = `${overallPct}%`;
+
+        // 4. Check for active lectures in enrolled subjects
+        await checkActiveLectures(enrolledSubjects, attendanceRecords);
+
+        // 5. Render Subject-wise Attendance Table
+        renderSubjectTable(enrolledSubjects, attendanceRecords);
+
+      } catch (err) {
+        console.error("Student dashboard error:", err);
+        errorAlert.textContent = "Failed to load dashboard data: " + err.message;
+        errorAlert.style.display = "flex";
+      }
+    }
+
+    async function checkActiveLectures(enrolledSubjects, attendanceRecords) {
+      const activeContentEl = document.getElementById('active-lecture-content');
+      const badgeEl = document.getElementById('active-count-badge');
+
+      if (enrolledSubjects.length === 0) {
+        activeContentEl.innerHTML = `<p style="color: var(--text-muted);">You are not enrolled in any subject yet. Your teacher will add you to your subjects after you register.</p>`;
+        badgeEl.innerHTML = `<span class="badge badge-secondary">0 Active</span>`;
+        return;
+      }
+
+
+      // Fetch active lectures for enrolled subjects
+      const activeLectures = [];
+      for (const sub of enrolledSubjects) {
+        const q = query(collection(db, 'lectures'), where('subjectId', '==', sub.id), where('status', '==', 'active'));
+        const snap = await getDocs(q);
+        snap.forEach(d => activeLectures.push({ id: d.id, ...d.data() }));
+      }
+
+      if (activeLectures.length === 0) {
+        badgeEl.innerHTML = `<span class="badge badge-secondary">No Active Session</span>`;
+        activeContentEl.innerHTML = `
+          <div style="padding: 1rem 0; color: var(--text-muted);">
+            There are no ongoing live lectures for your enrolled subjects right now.
+          </div>
+        `;
+        return;
+      }
+
+      badgeEl.innerHTML = `<span class="badge badge-success">● ${activeLectures.length} Live Lecture(s)</span>`;
+
+      activeContentEl.innerHTML = activeLectures.map(lecture => {
+        const isMarked = attendanceRecords.some(r => r.lectureId === lecture.id && r.status === 'present');
+
+        return `
+          <div style="border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.15rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; background: #fafafa;">
+            <div>
+              <h3 style="font-size: 1.1rem; color: var(--primary);">${esc(lecture.subjectName)}</h3>
+              <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Teacher: <strong>${esc(lecture.teacherName)}</strong> &bull; Started at: <strong>${esc(lecture.startTime)}</strong>
+              </p>
+            </div>
+            <div>
+              ${isMarked ? `
+                <span class="badge badge-success" style="font-size: 0.9rem; padding: 0.5rem 0.85rem;">
+                  ✅ Attendance Marked (Present)
+                </span>
+              ` : `
+                <a href="student-mark-attendance.html?lecture=${lecture.id}" class="btn btn-success">
+                  ✅ Mark Attendance
+                </a>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSubjectTable(enrolledSubjects, attendanceRecords) {
+      const tbody = document.getElementById('attendance-tbody');
+
+      if (!enrolledSubjects || enrolledSubjects.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              You are not enrolled in any subject yet. Your teacher will add you to your subjects after you register.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+
+      tbody.innerHTML = enrolledSubjects.map(sub => {
+        const subRecords = attendanceRecords.filter(r => r.subjectId === sub.id);
+        const presentCount = subRecords.filter(r => r.status === 'present').length;
+        const absentCount = subRecords.filter(r => r.status === 'absent').length;
+        const total = presentCount + absentCount;
+        const pct = percent(presentCount, total);
+        const isLow = total > 0 && pct < MIN_PERCENT;
+
+        return `
+          <tr class="${isLow ? 'low-attendance-row' : ''}">
+            <td><strong>${esc(sub.name)}</strong></td>
+            <td>${total}</td>
+            <td style="color: var(--success-text); font-weight: 600;">${presentCount}</td>
+            <td style="color: var(--danger-text); font-weight: 600;">${absentCount}</td>
+            <td><strong>${pct}%</strong></td>
+            <td>
+              ${total === 0 ? '<span class="badge badge-muted">No Data</span>' : 
+                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` : 
+                '<span class="badge badge-success">Good</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    loadStudentDashboard();
+  </script>
+</body>
+</html>

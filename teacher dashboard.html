@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Dashboard - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar"></header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Teacher Dashboard</h1>
+            <p class="page-subtitle" id="welcome-msg">Overview of your subjects, active lectures, and student attendance.</p>
+          </div>
+          <div>
+            <a href="teacher-start-lecture.html" class="btn btn-primary">▶️ Start New Lecture</a>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Stat Cards -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📚</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Subjects</div>
+              <div class="stat-value" id="stat-subjects">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Students</div>
+              <div class="stat-value" id="stat-students">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-success">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <div class="stat-label">Present Today</div>
+              <div class="stat-value" id="stat-present-today">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-danger">
+            <div class="stat-icon">❌</div>
+            <div class="stat-info">
+              <div class="stat-label">Absent Today</div>
+              <div class="stat-value" id="stat-absent-today">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">📡</div>
+            <div class="stat-info">
+              <div class="stat-label">Active Lecture</div>
+              <div class="stat-value" id="stat-active-lecture">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">🔒</div>
+            <div class="stat-info">
+              <div class="stat-label">Closed Lectures</div>
+              <div class="stat-value" id="stat-closed-lectures">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Active Lecture Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Current Lecture Status</h2>
+            <span id="active-badge-container"></span>
+          </div>
+          <div id="current-lecture-content">
+            <p style="color: var(--text-muted);">Loading active lecture status...</p>
+          </div>
+        </div>
+
+        <!-- Quick Actions Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Quick Actions</h2>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+            <a href="teacher-subjects.html" class="btn btn-ghost">➕ Add Subject</a>
+            <a href="teacher-students.html" class="btn btn-ghost">👥 Manage Students</a>
+            <a href="teacher-start-lecture.html" class="btn btn-primary">▶️ Start Lecture</a>
+            <a href="teacher-daily-report.html" class="btn btn-ghost">📅 View Attendance</a>
+            <a href="monthly-report.html" class="btn btn-ghost">📈 Monthly Report</a>
+            <button id="quick-stop-btn" class="btn btn-danger" style="display: none;">⛔ Stop Lecture</button>
+            <a href="logout.html" class="btn btn-ghost" style="color: var(--danger);">🚪 Logout</a>
+          </div>
+        </div>
+
+        <!-- Assigned Subjects Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Assigned Subjects</h2>
+            <a href="teacher-subjects.html" class="btn btn-sm btn-ghost">Manage All</a>
+          </div>
+          <div class="table-responsive">
+            <table class="table" id="subjects-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Class</th>
+                  <th>Division</th>
+                  <th>Semester</th>
+                  <th>Students</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="subjects-tbody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading subjects...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      query,
+      where,
+      stopLecture,
+      todayStr,
+      esc,
+      toast
+    } from './js/app.js';
+
+    let session = getSession();
+    const errorAlert = document.getElementById('error-alert');
+
+    mountShell('teacher', 'dashboard').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        loadDashboard();
+      }
+    });
+
+    if (session && session.id) {
+      loadDashboard();
+    }
+
+    let currentActiveLecture = null;
+
+    async function loadDashboard() {
+      const teacherId = (session && session.id) || (auth.currentUser && auth.currentUser.uid);
+      if (!teacherId) return;
+      errorAlert.style.display = 'none';
+
+      try {
+        // 1. Fetch teacher's subjects
+        const subjectsQ = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+        const subjectsSnap = await getDocs(subjectsQ);
+        const subjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        document.getElementById('stat-subjects').textContent = subjects.length;
+
+        // Unique students set
+        const uniqueStudents = new Set();
+        const subjectIds = [];
+        subjects.forEach(s => {
+          subjectIds.push(s.id);
+          (s.studentIds || []).forEach(stId => uniqueStudents.add(stId));
+        });
+        document.getElementById('stat-students').textContent = uniqueStudents.size;
+
+        // 2. Fetch lectures for this teacher
+        const lecturesQ = query(collection(db, 'lectures'), where('teacherId', '==', session.id));
+        const lecturesSnap = await getDocs(lecturesQ);
+        const lectures = lecturesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const activeLectures = lectures.filter(l => l.status === 'active');
+        const closedLectures = lectures.filter(l => l.status === 'closed');
+
+        document.getElementById('stat-active-lecture').textContent = activeLectures.length;
+        document.getElementById('stat-closed-lectures').textContent = closedLectures.length;
+
+        currentActiveLecture = activeLectures.length > 0 ? activeLectures[0] : null;
+
+        // Render Current Lecture Panel
+        renderCurrentLecturePanel(currentActiveLecture);
+
+        // 3. Fetch Today's Attendance stats across teacher's subjects
+        const today = todayStr();
+        let presentToday = 0;
+        let absentToday = 0;
+
+        if (subjectIds.length > 0) {
+          const attQ = query(collection(db, 'attendance'), where('date', '==', today));
+          const attSnap = await getDocs(attQ);
+          
+          attSnap.forEach(d => {
+            const data = d.data();
+            if (subjectIds.includes(data.subjectId)) {
+              if (data.status === 'present') presentToday++;
+              else if (data.status === 'absent') absentToday++;
+            }
+          });
+        }
+
+        document.getElementById('stat-present-today').textContent = presentToday;
+        document.getElementById('stat-absent-today').textContent = absentToday;
+
+        // 4. Render Subjects Table
+        renderSubjectsTable(subjects, activeLectures);
+
+      } catch (err) {
+        console.error("Dashboard error:", err);
+        errorAlert.textContent = "Failed to load dashboard data: " + err.message;
+        errorAlert.style.display = "flex";
+      }
+    }
+
+    function renderCurrentLecturePanel(lecture) {
+      const contentEl = document.getElementById('current-lecture-content');
+      const badgeEl = document.getElementById('active-badge-container');
+      const quickStopBtn = document.getElementById('quick-stop-btn');
+
+      if (lecture) {
+        badgeEl.innerHTML = `<span class="badge badge-success">● Live / Running</span>`;
+        quickStopBtn.style.display = 'inline-flex';
+        
+        contentEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h3 style="font-size: 1.25rem; color: var(--primary);">${esc(lecture.subjectName)}</h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">
+                Class: <strong>${esc(lecture.class)} - ${esc(lecture.division)}</strong> &bull; Started at: <strong>${esc(lecture.startTime)}</strong>
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+              <a href="teacher-live-attendance.html?lecture=${lecture.id}" class="btn btn-success">
+                📡 Live Attendance Console
+              </a>
+              <button id="stop-lecture-btn" class="btn btn-danger">
+                ⛔ Stop Lecture
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('stop-lecture-btn')?.addEventListener('click', handleStopLecture);
+        quickStopBtn.onclick = handleStopLecture;
+      } else {
+        badgeEl.innerHTML = `<span class="badge badge-secondary">Idle</span>`;
+        quickStopBtn.style.display = 'none';
+
+        contentEl.innerHTML = `
+          <div style="text-align: center; padding: 1.5rem;">
+            <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 1rem;">No lecture is currently running.</p>
+            <a href="teacher-start-lecture.html" class="btn btn-primary">▶️ Start a Lecture Now</a>
+          </div>
+        `;
+      }
+    }
+
+    async function handleStopLecture() {
+      if (!currentActiveLecture) return;
+      if (!confirm(`Are you sure you want to stop the lecture for "${currentActiveLecture.subjectName}"? Unmarked students will be marked absent.`)) {
+        return;
+      }
+
+      try {
+        await stopLecture(currentActiveLecture);
+        toast("Lecture stopped successfully.", "success");
+        await loadDashboard();
+      } catch (err) {
+        console.error("Stop lecture error:", err);
+        toast("Failed to stop lecture: " + err.message, "danger");
+      }
+    }
+
+    function renderSubjectsTable(subjects, activeLectures) {
+      const tbody = document.getElementById('subjects-tbody');
+      if (!subjects || subjects.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No subjects created yet. <a href="teacher-subjects.html">Create your first subject</a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const activeSubjectIds = new Set(activeLectures.map(l => l.subjectId));
+
+      tbody.innerHTML = subjects.map(s => {
+        const isActive = activeSubjectIds.has(s.id);
+        const activeLect = activeLectures.find(l => l.subjectId === s.id);
+        return `
+          <tr>
+            <td><strong>${esc(s.name)}</strong></td>
+            <td>${esc(s.class || '-')}</td>
+            <td>${esc(s.division || '-')}</td>
+            <td>${esc(s.semester || '-')}</td>
+            <td>${(s.studentIds || []).length} enrolled</td>
+            <td>
+              ${isActive ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Idle</span>'}
+            </td>
+            <td>
+              ${isActive ? `<a href="teacher-live-attendance.html?lecture=${activeLect.id}" class="btn btn-sm btn-success">View Live</a>` : `<a href="teacher-start-lecture.html?subject=${s.id}" class="btn btn-sm btn-ghost">Start</a>`}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

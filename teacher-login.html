@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Login - Student Attendance System</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .split-container {
+      display: flex;
+      min-height: 100vh;
+      background: var(--bg-main);
+    }
+    .split-navy-panel {
+      flex: 1;
+      background: linear-gradient(135deg, var(--bg-sidebar) 0%, #1e293b 100%);
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .split-navy-panel::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 50%;
+      top: -50px;
+      right: -50px;
+    }
+    .brand-title {
+      font-size: 2.25rem;
+      color: #ffffff;
+      margin-bottom: 1rem;
+    }
+    .brand-title span {
+      color: var(--amber-accent);
+    }
+    .brand-subtitle {
+      font-size: 1.05rem;
+      color: #94a3b8;
+      line-height: 1.6;
+      max-width: 440px;
+    }
+    .split-form-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem;
+      background: #ffffff;
+    }
+    .form-wrapper {
+      width: 100%;
+      max-width: 400px;
+    }
+    .form-header {
+      margin-bottom: 2rem;
+    }
+    .form-title {
+      font-size: 1.8rem;
+      color: var(--primary);
+      margin-bottom: 0.4rem;
+    }
+    .form-subtext {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 850px) {
+      .split-container {
+        flex-direction: column;
+      }
+      .split-navy-panel {
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+      }
+      .brand-subtitle {
+        margin: 0 auto;
+      }
+      .split-form-panel {
+        padding: 2rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="split-container">
+    <div class="split-navy-panel">
+      <div>
+        <h1 class="brand-title">Teacher <span>Portal</span></h1>
+        <p class="brand-subtitle">Manage your classes, host real-time attendance sessions, and monitor student participation effortlessly.</p>
+      </div>
+    </div>
+
+    <div class="split-form-panel">
+      <div class="form-wrapper">
+        <div class="form-header">
+          <h2 class="form-title">Welcome Back</h2>
+          <p class="form-subtext">Log in with your teacher credentials</p>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" class="form-control" placeholder="teacher@college.edu" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" class="form-control" placeholder="Enter password" required>
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn btn-primary btn-lg btn-block" style="margin-top: 1.5rem;">
+            Log In as Teacher
+          </button>
+        </form>
+
+        <div style="margin-top: 1.75rem; text-align: center; font-size: 0.875rem;">
+          <a href="register.html" style="color: var(--primary); font-weight: 600;">Create an Account</a>
+          <span style="margin: 0 0.5rem; color: #cbd5e1;">|</span>
+          <a href="index.html" style="color: var(--text-muted);">Role Selection</a>
+          <span style="margin: 0 0.5rem; color: #cbd5e1;">|</span>
+          <a href="student-login.html" style="color: var(--primary);">Student Login</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { getSession, loginUser } from './js/app.js';
+
+    // Auto-redirect if already logged in as teacher
+    const session = getSession();
+    if (session && session.role === 'teacher') {
+      window.location.href = 'teacher-dashboard.html';
+    }
+
+    const form = document.getElementById('login-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submit-btn');
+    const errorAlert = document.getElementById('error-alert');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorAlert.style.display = 'none';
+      errorAlert.textContent = '';
+      
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!email || !password) {
+        errorAlert.textContent = 'Please enter both email and password.';
+        errorAlert.style.display = 'flex';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Signing in...';
+
+      try {
+        const res = await loginUser('teacher', email, password);
+        if (res.ok) {
+          if (res.needsVerification) {
+            window.location.href = 'verify-email.html';
+          } else {
+            window.location.href = 'teacher-dashboard.html';
+          }
+        } else {
+          errorAlert.textContent = res.error || 'Invalid email or password.';
+          errorAlert.style.display = 'flex';
+        }
+      } catch (err) {
+        console.error("Login error:", err);
+        errorAlert.textContent = 'Unable to connect to database. Please check your internet connection or try again later.';
+        errorAlert.style.display = 'flex';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Log In as Teacher';
+      }
+    });
+  </script>
+</body>
+</html>

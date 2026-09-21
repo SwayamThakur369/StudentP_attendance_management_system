@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logging Out...</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg-main);">
+  <div style="text-align: center; background: #fff; padding: 2rem; border-radius: var(--radius-md); box-shadow: var(--shadow-md);">
+    <h2 style="color: var(--primary); margin-bottom: 0.5rem;">Logging Out</h2>
+    <p style="color: var(--text-muted);">Clearing session and redirecting...</p>
+  </div>
+
+  <script type="module">
+    import { auth, signOut, clearSession } from './js/app.js';
+    
+    (async () => {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error("SignOut error:", err);
+      }
+      clearSession();
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 400);
+    })();
+  </script>
+</body>
+</html>
