@@ -22,6 +22,7 @@
         <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
         <a href="teacher-daily-report.html" class="nav-item"><span>📅</span><span>Daily Report</span></a>
         <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="defaulters.html" class="nav-item"><span>⚠️</span><span>Defaulters</span></a>
         <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
       </nav>
       <div class="sidebar-footer">
@@ -104,6 +105,11 @@
                 <label class="form-label" for="subject-year">Academic Year *</label>
                 <input type="text" id="subject-year" class="form-control" placeholder="e.g. 2026-27" required>
               </div>
+
+              <div class="form-group">
+                <label class="form-label" for="subject-min-attendance">Minimum Attendance % *</label>
+                <input type="number" id="subject-min-attendance" class="form-control" min="0" max="100" step="1" value="75" placeholder="75" required>
+              </div>
             </div>
 
             <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
@@ -127,13 +133,14 @@
                   <th>Division</th>
                   <th>Semester</th>
                   <th>Academic Year</th>
+                  <th>Min Attendance</th>
                   <th>Enrolled Students</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="subjects-tbody">
                 <tr>
-                  <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading subjects...</td>
+                  <td colspan="8" style="text-align: center; color: var(--text-muted);">Loading subjects...</td>
                 </tr>
               </tbody>
             </table>
@@ -241,6 +248,7 @@
     const divInput = document.getElementById('subject-division');
     const semInput = document.getElementById('subject-semester');
     const yearInput = document.getElementById('subject-year');
+    const minAttInput = document.getElementById('subject-min-attendance');
     
     const saveBtn = document.getElementById('save-btn');
     const cancelBtn = document.getElementById('cancel-btn');
@@ -253,7 +261,7 @@
       if (teacherSubjects.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
               No subjects found. Use the form above to add your first subject.
             </td>
           </tr>
@@ -268,6 +276,7 @@
           <td>${esc(sub.division)}</td>
           <td>Sem ${esc(sub.semester)}</td>
           <td>${esc(sub.academicYear)}</td>
+          <td><span class="badge badge-warning" style="font-weight: 600;">${esc(sub.minAttendance ?? 75)}%</span></td>
           <td><span class="badge badge-success">${(sub.studentIds || []).length} students</span></td>
           <td>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -310,6 +319,7 @@
       divInput.value = sub.division;
       semInput.value = sub.semester;
       yearInput.value = sub.academicYear;
+      minAttInput.value = sub.minAttendance ?? 75;
 
       formTitle.textContent = "Edit Subject";
       saveBtn.textContent = "💾 Update Subject";
@@ -321,6 +331,7 @@
     function resetForm() {
       editIdInput.value = '';
       form.reset();
+      minAttInput.value = 75;
       formTitle.textContent = "Add New Subject";
       saveBtn.textContent = "+ Add Subject";
       cancelBtn.style.display = "none";
@@ -342,9 +353,16 @@
       const division = divInput.value;
       const semester = parseInt(semInput.value, 10);
       const academicYear = yearInput.value.trim();
+      const minAttVal = minAttInput.value.trim();
+      const minAttendance = minAttVal !== '' ? Number(minAttVal) : 75;
 
       if (!name || !className || !division || isNaN(semester) || !academicYear) {
         alert("Please fill in all required fields.");
+        return;
+      }
+
+      if (isNaN(minAttendance) || minAttendance < 0 || minAttendance > 100) {
+        alert("Minimum attendance percentage must be between 0 and 100.");
         return;
       }
 
@@ -361,7 +379,8 @@
             class: className,
             division,
             semester,
-            academicYear
+            academicYear,
+            minAttendance: Number(minAttendance)
           });
           toast("Subject updated successfully!", "success");
           resetForm();
@@ -375,6 +394,7 @@
             division,
             semester,
             academicYear,
+            minAttendance: Number(minAttendance),
             studentIds: []
           });
           toast("Subject added successfully!", "success");

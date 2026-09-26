@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Defaulters - Student AMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .defaulter-row {
+      background-color: #fef2f2 !important;
+    }
+    .threshold-banner {
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 500;
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          🎓 Student<span class="accent">AMS</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher-dashboard.html" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+        <a href="teacher-subjects.html" class="nav-item"><span>📚</span><span>Subjects</span></a>
+        <a href="teacher-students.html" class="nav-item"><span>👥</span><span>Students</span></a>
+        <a href="teacher-start-lecture.html" class="nav-item"><span>▶️</span><span>Start Lecture</span></a>
+        <a href="attendance.html" class="nav-item"><span>📡</span><span>Live Attendance</span></a>
+        <a href="teacher-daily-report.html" class="nav-item"><span>📅</span><span>Daily Report</span></a>
+        <a href="monthly-report.html" class="nav-item"><span>📈</span><span>Monthly Report</span></a>
+        <a href="defaulters.html" class="nav-item active"><span>⚠️</span><span>Defaulters</span></a>
+        <a href="teacher-profile.html" class="nav-item"><span>👤</span><span>Profile</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn btn-ghost btn-block" style="color: #cbd5e1; justify-content: flex-start; gap: 0.75rem;">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+    <div id="scrim" class="scrim sidebar-overlay"></div>
+
+    <div class="main-wrapper">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="menu-toggle-btn" class="menu-toggle-btn" aria-label="Toggle Sidebar">☰</button>
+          <h1 class="topbar-title">Student Attendance Management System</h1>
+        </div>
+        <div class="topbar-user">
+          <div class="user-badge">
+            <span class="user-name">Teacher</span>
+            <span class="user-role">teacher</span>
+          </div>
+          <div class="avatar-circle">T</div>
+        </div>
+      </header>
+
+      <main class="content page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Defaulters List</h1>
+            <p class="page-subtitle">Track students who fall below the subject minimum attendance threshold.</p>
+          </div>
+          <div>
+            <button id="download-csv-btn" class="btn btn-primary" disabled>📥 Download CSV</button>
+          </div>
+        </div>
+
+        <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <!-- Filters Panel -->
+        <div class="panel">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="subject-select">Select Subject *</label>
+              <select id="subject-select" class="form-select">
+                <option value="">-- Loading Subjects --</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="month-picker">Select Month *</label>
+              <input type="month" id="month-picker" class="form-control">
+            </div>
+          </div>
+
+          <div id="threshold-banner" class="threshold-banner" style="display: none;">
+            <span>ℹ️</span>
+            <span id="threshold-banner-text"></span>
+          </div>
+        </div>
+
+        <!-- Summary Stat Cards -->
+        <div class="stat-grid">
+          <div class="stat-card accent-danger">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-info">
+              <div class="stat-label">Defaulters Count</div>
+              <div class="stat-value" id="stat-defaulter-count">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Enrolled</div>
+              <div class="stat-value" id="stat-total-students">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">🔒</div>
+            <div class="stat-info">
+              <div class="stat-label">Closed Lectures</div>
+              <div class="stat-value" id="stat-total-lectures">0</div>
+            </div>
+          </div>
+
+          <div class="stat-card accent-amber">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <div class="stat-label">Min Threshold</div>
+              <div class="stat-value" id="stat-threshold">--%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Defaulters Table Panel -->
+        <div class="panel">
+          <div class="panel-header" style="flex-wrap: wrap; gap: 0.5rem;">
+            <h2 class="panel-title">Defaulters Roster</h2>
+            <div id="summary-line" style="font-size: 0.95rem; color: var(--text-muted); font-weight: 500;"></div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table" id="defaulters-table">
+              <thead>
+                <tr>
+                  <th>Roll No</th>
+                  <th>Student Name</th>
+                  <th>Total Lectures</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Attendance %</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="defaulters-tbody">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading defaulters data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      auth,
+      getSession,
+      mountShell,
+      db,
+      collection,
+      getDocs,
+      query,
+      where,
+      todayStr,
+      monthOf,
+      getStudents,
+      percent,
+      isLow,
+      MIN_PERCENT,
+      downloadCSV,
+      esc,
+      toast
+    } from './js/app.js';
+
+    const monthPicker = document.getElementById('month-picker');
+    const subjectSelect = document.getElementById('subject-select');
+    const thresholdBanner = document.getElementById('threshold-banner');
+    const thresholdBannerText = document.getElementById('threshold-banner-text');
+    const downloadBtn = document.getElementById('download-csv-btn');
+    const summaryLine = document.getElementById('summary-line');
+    const errorAlert = document.getElementById('error-alert');
+    const tbody = document.getElementById('defaulters-tbody');
+
+    const statDefaulterCount = document.getElementById('stat-defaulter-count');
+    const statTotalStudents = document.getElementById('stat-total-students');
+    const statTotalLectures = document.getElementById('stat-total-lectures');
+    const statThreshold = document.getElementById('stat-threshold');
+
+    monthPicker.value = monthOf(todayStr());
+
+    let session = getSession();
+    let teacherSubjects = [];
+    let currentDefaulters = [];
+    let currentSelectedSubject = null;
+
+    function formatMonthName(monthStr) {
+      if (!monthStr) return '';
+      const [y, m] = monthStr.split('-');
+      if (!y || !m) return monthStr;
+      const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    mountShell('teacher', 'defaulters').then(confirmedSession => {
+      if (confirmedSession) {
+        session = confirmedSession;
+        initDefaulters();
+      }
+    });
+
+    if (session && session.id && session.role === 'teacher') {
+      initDefaulters();
+    }
+
+    async function initDefaulters() {
+      const teacherId = (session && session.id) || (auth.currentUser && auth.currentUser.uid);
+      if (!teacherId) return;
+
+      errorAlert.style.display = 'none';
+
+      try {
+        const qSub = query(collection(db, 'subjects'), where('teacherId', '==', teacherId));
+        const subSnap = await getDocs(qSub);
+        teacherSubjects = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (teacherSubjects.length === 0) {
+          subjectSelect.innerHTML = `<option value="">No subjects found</option>`;
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                No subjects found. Create subjects and assign students first.
+              </td>
+            </tr>
+          `;
+          thresholdBanner.style.display = 'none';
+          summaryLine.textContent = '';
+          return;
+        }
+
+        // Populate dropdown with subject's minAttendance
+        subjectSelect.innerHTML = teacherSubjects.map(s => {
+          const thresh = (s.minAttendance !== undefined && s.minAttendance !== null && !isNaN(Number(s.minAttendance)))
+            ? Number(s.minAttendance)
+            : MIN_PERCENT;
+          return `<option value="${s.id}">${esc(s.name)} (min ${thresh}%)</option>`;
+        }).join('');
+
+        await loadDefaulters();
+
+      } catch (err) {
+        console.error("Init defaulters error:", err);
+        errorAlert.textContent = "Failed to load subjects: " + err.message;
+        errorAlert.style.display = 'flex';
+      }
+    }
+
+    subjectSelect.addEventListener('change', loadDefaulters);
+    monthPicker.addEventListener('change', loadDefaulters);
+
+    async function loadDefaulters() {
+      const selectedSubId = subjectSelect.value;
+      const selectedMonth = monthPicker.value;
+
+      if (!selectedSubId || !selectedMonth) return;
+
+      errorAlert.style.display = 'none';
+      downloadBtn.disabled = true;
+      currentDefaulters = [];
+
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            Calculating defaulters list...
+          </td>
+        </tr>
+      `;
+
+      try {
+        const subject = teacherSubjects.find(s => s.id === selectedSubId);
+        if (!subject) return;
+        currentSelectedSubject = subject;
+
+        const threshold = (subject.minAttendance !== undefined && subject.minAttendance !== null && !isNaN(Number(subject.minAttendance)))
+          ? Number(subject.minAttendance)
+          : MIN_PERCENT;
+
+        statThreshold.textContent = `${threshold}%`;
+
+        // Update banner: "Showing students below X% for Subject - Month YYYY"
+        const monthLabel = formatMonthName(selectedMonth);
+        thresholdBannerText.textContent = `Showing students below ${threshold}% for ${subject.name} - ${monthLabel}`;
+        thresholdBanner.style.display = 'flex';
+
+        // 1. Fetch CLOSED lectures for this subject in the selected month
+        const lectQ = query(
+          collection(db, 'lectures'),
+          where('subjectId', '==', selectedSubId)
+        );
+        const lectSnap = await getDocs(lectQ);
+        const closedLectures = lectSnap.docs.filter(d => {
+          const data = d.data();
+          const inMonth = data.month === selectedMonth || (data.date && data.date.startsWith(selectedMonth));
+          return inMonth && data.status === 'closed';
+        });
+
+        const totalLectures = closedLectures.length;
+        statTotalLectures.textContent = totalLectures;
+
+        // 2. Fetch enrolled students
+        const enrolledIds = subject.studentIds || [];
+        const enrolledStudents = await getStudents(enrolledIds);
+        statTotalStudents.textContent = enrolledStudents.length;
+
+        // Separate empty state when subject has zero closed lectures that month
+        if (totalLectures === 0) {
+          statDefaulterCount.textContent = '0';
+          summaryLine.textContent = `No closed lectures were held for ${subject.name} in ${monthLabel}.`;
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+                No lectures were held yet in this month.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        if (enrolledStudents.length === 0) {
+          statDefaulterCount.textContent = '0';
+          summaryLine.textContent = `No students enrolled in ${subject.name}.`;
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+                No students enrolled in this subject.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        // 3. Fetch attendance records for this subject in this month
+        const attQ = query(
+          collection(db, 'attendance'),
+          where('subjectId', '==', selectedSubId)
+        );
+        const attSnap = await getDocs(attQ);
+        const monthAttDocs = attSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(d => d.month === selectedMonth || (d.date && d.date.startsWith(selectedMonth)));
+
+        // Count present attendance per student
+        const presentMap = new Map();
+        monthAttDocs.forEach(d => {
+          if (d.status === 'present' && d.studentId) {
+            presentMap.set(d.studentId, (presentMap.get(d.studentId) || 0) + 1);
+          }
+        });
+
+        // 4. Calculate attendance and keep ONLY students where isLow() is true
+        const defaulters = [];
+        enrolledStudents.forEach(st => {
+          const present = presentMap.get(st.id) || 0;
+          const absent = Math.max(0, totalLectures - present);
+          const pct = percent(present, totalLectures);
+
+          if (isLow(present, totalLectures, threshold)) {
+            defaulters.push({
+              id: st.id,
+              rollNo: st.rollNo || '',
+              name: st.name || '',
+              class: st.class || subject.class || '',
+              division: st.division || subject.division || '',
+              totalLectures,
+              present,
+              absent,
+              pct,
+              threshold
+            });
+          }
+        });
+
+        // 5. Sort worst attendance first (lowest % first; secondary sort by rollNo)
+        defaulters.sort((a, b) => {
+          if (a.pct !== b.pct) return a.pct - b.pct;
+          return (a.rollNo || '').localeCompare(b.rollNo || '', undefined, { numeric: true });
+        });
+
+        currentDefaulters = defaulters;
+        statDefaulterCount.textContent = defaulters.length;
+
+        // 6. Summary line: "X of Y students are below the Z% threshold."
+        summaryLine.textContent = `${defaulters.length} of ${enrolledStudents.length} students are below the ${threshold}% threshold.`;
+
+        // 7. Render Table or Empty state: "No defaulters for this subject and month."
+        if (defaulters.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--success-text); padding: 2.5rem 1rem; font-weight: 600;">
+                ✅ No defaulters for this subject and month.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        downloadBtn.disabled = false;
+
+        tbody.innerHTML = defaulters.map(st => `
+          <tr class="defaulter-row">
+            <td><strong>${esc(st.rollNo)}</strong></td>
+            <td>${esc(st.name)}</td>
+            <td>${st.totalLectures}</td>
+            <td style="color: var(--success-text); font-weight: 600;">${st.present}</td>
+            <td style="color: var(--danger-text); font-weight: 600;">${st.absent}</td>
+            <td><strong style="color: var(--danger-text);">${st.pct}%</strong></td>
+            <td>
+              <span class="badge badge-warning">Low attendance (below ${threshold}%)</span>
+            </td>
+          </tr>
+        `).join('');
+
+      } catch (err) {
+        console.error("Load defaulters error:", err);
+        errorAlert.textContent = "Error calculating defaulters: " + err.message;
+        errorAlert.style.display = 'flex';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--danger-text); padding: 2rem;">
+              Failed to load defaulters. Please try again.
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (!currentDefaulters || currentDefaulters.length === 0 || !currentSelectedSubject) {
+        toast("No defaulters data to download.", "warning");
+        return;
+      }
+
+      const threshold = (currentSelectedSubject.minAttendance !== undefined && currentSelectedSubject.minAttendance !== null && !isNaN(Number(currentSelectedSubject.minAttendance)))
+        ? Number(currentSelectedSubject.minAttendance)
+        : MIN_PERCENT;
+
+      const selectedMonth = monthPicker.value;
+      const cleanSubName = (currentSelectedSubject.name || 'Subject').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `defaulters_${cleanSubName}_${selectedMonth}.csv`;
+
+      const rows = currentDefaulters.map(d => ({
+        "Roll No": d.rollNo,
+        "Student Name": d.name,
+        "Class": d.class,
+        "Division": d.division,
+        "Total Lectures": d.totalLectures,
+        "Present": d.present,
+        "Absent": d.absent,
+        "Attendance %": `${d.pct}%`,
+        "Threshold %": `${threshold}%`,
+        "Status": `Low attendance (below ${threshold}%)`
+      }));
+
+      downloadCSV(filename, rows);
+      toast(`Defaulters CSV downloaded: ${filename}`, "success");
+    });
+  </script>
+</body>
+</html>

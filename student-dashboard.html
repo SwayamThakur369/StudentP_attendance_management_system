@@ -142,6 +142,7 @@
       query,
       where,
       percent,
+      isLow,
       MIN_PERCENT,
       esc,
       toast
@@ -293,10 +294,13 @@
         const absentCount = subRecords.filter(r => r.status === 'absent').length;
         const total = presentCount + absentCount;
         const pct = percent(presentCount, total);
-        const isLow = total > 0 && pct < MIN_PERCENT;
+        const threshold = (sub.minAttendance !== undefined && sub.minAttendance !== null && !isNaN(Number(sub.minAttendance)))
+          ? Number(sub.minAttendance)
+          : MIN_PERCENT;
+        const low = isLow(presentCount, total, threshold);
 
         return `
-          <tr class="${isLow ? 'low-attendance-row' : ''}">
+          <tr class="${low ? 'low-attendance-row' : ''}">
             <td><strong>${esc(sub.name)}</strong></td>
             <td>${total}</td>
             <td style="color: var(--success-text); font-weight: 600;">${presentCount}</td>
@@ -304,7 +308,7 @@
             <td><strong>${pct}%</strong></td>
             <td>
               ${total === 0 ? '<span class="badge badge-muted">No Data</span>' : 
-                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` : 
+                low ? `<span class="badge badge-warning">Low attendance (below ${threshold}%)</span>` : 
                 '<span class="badge badge-success">Good</span>'}
             </td>
           </tr>

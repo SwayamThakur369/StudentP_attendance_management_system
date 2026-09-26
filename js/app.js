@@ -117,6 +117,14 @@ export function percent(present, total) {
   return Math.round((present / total) * 100);
 }
 
+export function isLow(presentCount, totalCount, minAttendance) {
+  if (!totalCount || totalCount <= 0) return false;
+  const threshold = (minAttendance !== undefined && minAttendance !== null && !isNaN(Number(minAttendance)))
+    ? Number(minAttendance)
+    : MIN_PERCENT;
+  return percent(presentCount, totalCount) < threshold;
+}
+
 export function toast(message, type = 'info') {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -431,6 +439,7 @@ function renderShellUI(session, activePage) {
     { title: 'Live Attendance', href: 'attendance.html', key: 'live-attendance', icon: '📡' },
     { title: 'Daily Report', href: 'teacher-daily-report.html', key: 'daily-report', icon: '📅' },
     { title: 'Monthly Report', href: 'monthly-report.html', key: 'monthly-report', icon: '📈' },
+    { title: 'Defaulters', href: 'defaulters.html', key: 'defaulters', icon: '⚠️' },
     { title: 'Profile', href: 'teacher-profile.html', key: 'profile', icon: '👤' }
   ];
 
@@ -447,12 +456,14 @@ function renderShellUI(session, activePage) {
   const isMonthlyReport = activePage === 'monthly-report' || activePage === 'monthly-attendance';
   const isAttendance = activePage === 'live-attendance' || activePage === 'mark-attendance';
   const isDailyReport = activePage === 'daily-report';
+  const isDefaulters = activePage === 'defaulters';
 
   const isItemActive = (itemKey) => {
     if (activePage === itemKey) return true;
     if (isMonthlyReport && (itemKey === 'monthly-report' || itemKey === 'monthly-attendance')) return true;
     if (isAttendance && (itemKey === 'live-attendance' || itemKey === 'mark-attendance')) return true;
     if (isDailyReport && itemKey === 'daily-report') return true;
+    if (isDefaulters && itemKey === 'defaulters') return true;
     return false;
   };
 

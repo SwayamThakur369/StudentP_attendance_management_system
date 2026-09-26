@@ -72,7 +72,7 @@
           <div class="stat-card accent-danger">
             <div class="stat-icon">⚠️</div>
             <div class="stat-info">
-              <div class="stat-label">Low Attendance (&lt;75%)</div>
+              <div class="stat-label" id="stat-low-label">Low Attendance</div>
               <div class="stat-value" id="stat-low-count">0</div>
             </div>
           </div>
@@ -115,6 +115,7 @@
       monthOf,
       getStudents,
       percent,
+      isLow,
       MIN_PERCENT,
       downloadCSV,
       esc,
@@ -253,6 +254,12 @@
         // Compute rows
         let totalPctSum = 0;
         let lowAttendanceCount = 0;
+        const threshold = (subject.minAttendance !== undefined && subject.minAttendance !== null && !isNaN(Number(subject.minAttendance)))
+          ? Number(subject.minAttendance)
+          : MIN_PERCENT;
+
+        const statLowLabel = document.getElementById('stat-low-label');
+        if (statLowLabel) statLowLabel.innerHTML = `Low Attendance (&lt;${threshold}%)`;
 
         const tableRows = enrolledStudents.map(st => {
           const present = studentPresentCounts.get(st.id) || 0;
@@ -262,7 +269,7 @@
           const pct = percent(present, total);
 
           totalPctSum += pct;
-          if (total > 0 && pct < MIN_PERCENT) {
+          if (isLow(present, total, threshold)) {
             lowAttendanceCount++;
           }
 
@@ -282,7 +289,7 @@
         document.getElementById('stat-avg-pct').textContent = `${avgPct}%`;
         document.getElementById('stat-low-count').textContent = lowAttendanceCount;
 
-        renderTeacherTable(tableRows);
+        renderTeacherTable(tableRows, threshold);
 
         // Prepare export rows
         reportExportRows = tableRows.map(r => ({
@@ -292,7 +299,8 @@
           "Present": r.present,
           "Absent": r.absent,
           "Attendance %": `${r.pct}%`,
-          "Status": (r.total > 0 && r.pct < MIN_PERCENT) ? "Low Attendance" : (r.total === 0 ? "No Lectures" : "Good")
+          "Threshold %": `${threshold}%`,
+          "Status": isLow(r.present, r.total, threshold) ? `Low Attendance (below ${threshold}%)` : (r.total === 0 ? "No Lectures" : "Good")
         }));
 
       } catch (err) {
@@ -302,7 +310,7 @@
       }
     }
 
-    function renderTeacherTable(rows) {
+    function renderTeacherTable(rows, threshold = MIN_PERCENT) {
       const thead = document.getElementById('report-thead');
       const tbody = document.getElementById('report-tbody');
 
@@ -330,9 +338,9 @@
       }
 
       tbody.innerHTML = rows.map(r => {
-        const isLow = r.total > 0 && r.pct < MIN_PERCENT;
+        const isLowRow = isLow(r.present, r.total, threshold);
         return `
-          <tr class="${isLow ? 'low-attendance-row' : ''}">
+          <tr class="${isLowRow ? 'low-attendance-row' : ''}">
             <td><strong>${esc(r.rollNo)}</strong></td>
             <td>${esc(r.name)}</td>
             <td>${r.total}</td>
@@ -341,7 +349,7 @@
             <td><strong>${r.pct}%</strong></td>
             <td>
               ${r.total === 0 ? '<span class="badge badge-muted">No Lectures</span>' :
-                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` :
+                isLowRow ? `<span class="badge badge-warning">Low attendance (below ${threshold}%)</span>` :
                 '<span class="badge badge-success">Good</span>'}
             </td>
           </tr>
@@ -414,18 +422,26 @@
           overallTotalLectures += totalLectures;
           overallPctSum += pct;
 
-          if (totalLectures > 0 && pct < MIN_PERCENT) {
+          const subThreshold = (sub.minAttendance !== undefined && sub.minAttendance !== null && !isNaN(Number(sub.minAttendance)))
+            ? Number(sub.minAttendance)
+            : MIN_PERCENT;
+
+          if (isLow(present, totalLectures, subThreshold)) {
             lowCount++;
           }
 
           return {
             subjectName: sub.name,
+            minAttendance: subThreshold,
             total: totalLectures,
             present,
             absent,
             pct
           };
         }));
+
+        const statLowLabel = document.getElementById('stat-low-label');
+        if (statLowLabel) statLowLabel.textContent = 'Low Attendance Subjects';
 
         const avgPct = tableRows.length > 0 ? Math.round(overallPctSum / tableRows.length) : 0;
 
@@ -442,7 +458,8 @@
           "Present": r.present,
           "Absent": r.absent,
           "Attendance %": `${r.pct}%`,
-          "Status": (r.total > 0 && r.pct < MIN_PERCENT) ? "Low Attendance" : (r.total === 0 ? "No Lectures" : "Good")
+          "Threshold %": `${r.minAttendance ?? MIN_PERCENT}%`,
+          "Status": isLow(r.present, r.total, r.minAttendance) ? `Low Attendance (below ${r.minAttendance ?? MIN_PERCENT}%)` : (r.total === 0 ? "No Lectures" : "Good")
         }));
 
       } catch (err) {
@@ -479,9 +496,10 @@
       }
 
       tbody.innerHTML = rows.map(r => {
-        const isLow = r.total > 0 && r.pct < MIN_PERCENT;
+        const thresh = r.minAttendance ?? MIN_PERCENT;
+        const isLowRow = isLow(r.present, r.total, thresh);
         return `
-          <tr class="${isLow ? 'low-attendance-row' : ''}">
+          <tr class="${isLowRow ? 'low-attendance-row' : ''}">
             <td><strong>${esc(r.subjectName)}</strong></td>
             <td>${r.total}</td>
             <td style="color: var(--success-text); font-weight: 600;">${r.present}</td>
@@ -489,7 +507,7 @@
             <td><strong>${r.pct}%</strong></td>
             <td>
               ${r.total === 0 ? '<span class="badge badge-muted">No Lectures</span>' :
-                isLow ? `<span class="badge badge-warning">Low (&lt;${MIN_PERCENT}%)</span>` :
+                isLowRow ? `<span class="badge badge-warning">Low attendance (below ${thresh}%)</span>` :
                 '<span class="badge badge-success">Good</span>'}
             </td>
           </tr>
